@@ -8,4 +8,7 @@ export default defineConfig({
   resolve: {
     extensions: ['.tsx', '.ts', '.jsx', '.js', '.json'],
   },
+  optimizeDeps: {
+    force: true, // 強制重新優化依賴
+  },
 });
