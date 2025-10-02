@@ -188,7 +188,7 @@ export function AIAnalysisSystem() {
     },
     {
       id: 'electrical',
-      name: t('electrical.issues'),
+      name: t('power.issues'),
       icon: <ElectricalIcon />,
       color: '#ffeb3b',
       keywords: ['electrical', 'power', '電源', '電流', 'circuit'],
@@ -410,7 +410,7 @@ export function AIAnalysisSystem() {
                     {(overviewStats.averageConfidence * 100).toFixed(1)}%
                   </Typography>
                   <Typography variant="body2" color="textSecondary">
-                    {t('prediction.accuracy.metric')}
+                    {t('prediction.accuracy')}
                   </Typography>
                 </CardContent>
               </Card>
@@ -489,7 +489,7 @@ export function AIAnalysisSystem() {
               <Card>
                 <CardContent>
                   <Typography variant="h6" gutterBottom>
-                    {t('recent.activity')}
+                    {t('recent.activities')}
                   </Typography>
                   <List dense>
                     {trainingData.slice(-5).reverse().map((data) => {

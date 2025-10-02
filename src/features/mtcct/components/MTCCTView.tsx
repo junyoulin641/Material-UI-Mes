@@ -11,32 +11,17 @@ import {
   CardContent,
   CardActions,
   Chip,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  List,
-  ListItem,
-  ListItemText,
-  ListItemIcon,
   LinearProgress,
   Alert,
-  Tooltip,
   Stack,
-  Divider,
 } from '@mui/material';
 import {
   Folder as FolderIcon,
-  InsertDriveFile as FileIcon,
   Download as DownloadIcon,
   Refresh as RefreshIcon,
   Search as SearchIcon,
-  Info as InfoIcon,
   CheckCircle as CheckCircleIcon,
   Error as ErrorIcon,
-  Warning as WarningIcon,
-  FolderOpen as FolderOpenIcon,
   Archive as ArchiveIcon,
 } from '@mui/icons-material';
 import { useToast } from '../../common/components/ToastSystem';
@@ -69,11 +54,8 @@ const MOCK_FILES: MTCCTFile[] = [];
 
 export function MTCCTManagement() {
   const [folders, setFolders] = useState<MTCCTFolder[]>(MOCK_FOLDERS);
-  const [selectedFolder, setSelectedFolder] = useState<MTCCTFolder | null>(null);
-  const [files, setFiles] = useState<MTCCTFile[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isScanning, setIsScanning] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
 
   const { showSuccess, showError, showInfo } = useToast();
@@ -91,35 +73,20 @@ export function MTCCTManagement() {
     showInfo(t('mtcct.scanning'), t('system.scan'));
 
     try {
-      // 模擬掃描過程
+      // TODO: 實際的資料夾掃描邏輯
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // 模擬發現新資料夾
-      const newFolder: MTCCTFolder = {
-        id: Date.now().toString(),
-        name: `New_Scan_${new Date().getHours()}${new Date().getMinutes()}`,
-        path: `/MTCCT/NewScan/${Date.now()}`,
-        size: '67.3 MB',
-        fileCount: 445,
-        lastModified: new Date(),
-        status: 'available',
-        type: 'log'
-      };
+      // TODO: 從後端 API 獲取掃描結果
+      const scannedFolders: MTCCTFolder[] = [];
 
-      setFolders(prev => [...prev, newFolder]);
-      showSuccess(t('mtcct.scan.complete.found', { count: 1 }), t('scan.result'));
+      setFolders(scannedFolders);
+      showSuccess(t('mtcct.scan.complete.found', { count: scannedFolders.length }), t('scan.result'));
     } catch (error) {
       showError(t('scan.error'), t('scan.failed'));
     } finally {
       setIsScanning(false);
     }
   }, [showSuccess, showError, showInfo, t]);
-
-  const handleFolderClick = useCallback((folder: MTCCTFolder) => {
-    setSelectedFolder(folder);
-    setFiles(MOCK_FILES.filter(file => file.folderId === folder.id));
-    setDetailsOpen(true);
-  }, []);
 
   const handleDownloadFolder = useCallback(async (folder: MTCCTFolder) => {
     showInfo(t('mtcct.download.start', { name: folder.name }), t('download.starting'));
@@ -152,23 +119,6 @@ export function MTCCTManagement() {
         return { ...prev, [folder.id]: newProgress };
       });
     }, 300);
-  }, [showSuccess, showInfo, t]);
-
-  const handleDownloadFile = useCallback(async (file: MTCCTFile) => {
-    showInfo(t('file.downloading', { name: file.name }), t('file.download'));
-
-    // 模擬檔案下載
-    const blob = new Blob([`Mock content for ${file.name}`], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    showSuccess(t('file.download.complete'), t('download.success'));
   }, [showSuccess, showInfo, t]);
 
   const getStatusColor = (status: MTCCTFolder['status']) => {
@@ -219,7 +169,7 @@ export function MTCCTManagement() {
             <TextField
               fullWidth
               size="small"
-              placeholder={t('search.folders.placeholder')}
+              placeholder={t('search.folder.path')}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               InputProps={{
@@ -239,7 +189,7 @@ export function MTCCTManagement() {
                 {isScanning ? t('scanning') : t('scan.folders')}
               </Button>
               <Chip
-                label={t('folders.count', { count: filteredFolders.length })}
+                label={t('file.count', { count: filteredFolders.length })}
                 color="primary"
                 variant="outlined"
               />
@@ -265,14 +215,12 @@ export function MTCCTManagement() {
             <Card
               sx={{
                 height: '100%',
-                cursor: 'pointer',
                 transition: 'all 0.2s',
                 '&:hover': {
                   transform: 'translateY(-2px)',
                   boxShadow: 4
                 }
               }}
-              onClick={() => handleFolderClick(folder)}
             >
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
@@ -331,16 +279,6 @@ export function MTCCTManagement() {
               <CardActions>
                 <Button
                   size="small"
-                  startIcon={<FolderOpenIcon />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleFolderClick(folder);
-                  }}
-                >
-                  {t('view')}
-                </Button>
-                <Button
-                  size="small"
                   startIcon={<DownloadIcon />}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -368,89 +306,6 @@ export function MTCCTManagement() {
           </Typography>
         </Paper>
       )}
-
-      {/* 資料夾詳情對話框 */}
-      <Dialog
-        open={detailsOpen}
-        onClose={() => setDetailsOpen(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <FolderIcon sx={{ mr: 1 }} />
-            {selectedFolder?.name}
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          {selectedFolder && (
-            <>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                <Typography variant="body2">
-                  {t('path')}: {selectedFolder.path}<br />
-                  {t('size')}: {selectedFolder.size} | {t('file.count')}: {selectedFolder.fileCount.toLocaleString()}
-                </Typography>
-              </Alert>
-
-              <Typography variant="h6" gutterBottom>
-                {t('file.list', { count: files.length })}
-              </Typography>
-
-              <List>
-                {files.map((file) => (
-                  <React.Fragment key={file.id}>
-                    <ListItem>
-                      <ListItemIcon>
-                        <FileIcon />
-                      </ListItemIcon>
-                      <ListItemText
-                        primary={file.name}
-                        secondary={`${file.size} | ${file.lastModified.toLocaleString()}`}
-                      />
-                      <Tooltip title={t('download.file')}>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDownloadFile(file)}
-                        >
-                          <DownloadIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </ListItem>
-                    <Divider />
-                  </React.Fragment>
-                ))}
-              </List>
-
-              {files.length === 0 && (
-                <Box sx={{ textAlign: 'center', py: 4 }}>
-                  <FileIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 1 }} />
-                  <Typography color="text.secondary">
-                    {t('no.files.in.folder')}
-                  </Typography>
-                </Box>
-              )}
-            </>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setDetailsOpen(false)}>
-            {t('close')}
-          </Button>
-          {selectedFolder && (
-            <Button
-              variant="contained"
-              startIcon={<DownloadIcon />}
-              onClick={() => {
-                handleDownloadFolder(selectedFolder);
-                setDetailsOpen(false);
-              }}
-              disabled={selectedFolder.status === 'downloading'}
-            >
-              {t('download.entire.folder')}
-            </Button>
-          )}
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 }

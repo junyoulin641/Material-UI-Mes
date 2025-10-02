@@ -54,7 +54,7 @@ const loadRealTestData = async () => {
     const records = await db.getAllTestRecords();
 
     if (records.length > 0) {
-      console.log(`儀表板從 IndexedDB 載入 ${records.length} 筆記錄`);
+      console.log(`✅ 儀表板從 IndexedDB 載入 ${records.length} 筆記錄`);
       return records.map((record, index) => ({
         id: record.id || index + 1,
         serialNumber: record.serialNumber || '',
@@ -77,7 +77,7 @@ const loadRealTestData = async () => {
     const storedData = localStorage.getItem('mesTestData');
     if (storedData) {
       const parsedData = JSON.parse(storedData);
-      console.log(`儀表板從 localStorage 載入 ${parsedData.length} 筆記錄`);
+      console.log(`📦 儀表板從 localStorage 載入 ${parsedData.length} 筆記錄`);
       return parsedData.map((record: any, index: number) => ({
         id: index + 1,
         serialNumber: record.serialNumber || '',
@@ -96,6 +96,31 @@ const loadRealTestData = async () => {
   }
 
   return [];
+};
+
+// 模擬測試數據（備用）
+const generateMockData = () => {
+  const stations: string[] = [];
+  const models: string[] = [];
+  const results = ['PASS', 'FAIL'];
+
+  const records = [];
+  for (let i = 0; i < 0; i++) {
+    const randomDate = new Date();
+    randomDate.setDate(randomDate.getDate() - Math.floor(Math.random() * 7));
+
+    records.push({
+      id: i + 1,
+      serialNumber: `CH${Math.random().toString().substr(2, 12)}`,
+      workOrder: `6210018423-000${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`,
+      station: stations[Math.floor(Math.random() * stations.length)],
+      model: models[Math.floor(Math.random() * models.length)],
+      result: Math.random() > 0.2 ? 'PASS' : 'FAIL', // 80% pass rate
+      testTime: randomDate.toLocaleString(),
+      tester: `2001092${Math.floor(Math.random() * 10)}A`,
+    });
+  }
+  return records;
 };
 
 interface CompleteMesDashboardProps {
@@ -122,7 +147,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
     recentRecords: { width: 50, height: 400 },
     modelStats: { width: 50, height: 400 }
   });
-  const [dragState, setDragState] = useState<{
+  const [dragState, setDragState] = useState<{ 
     isDragging: boolean;
     cardId: string;
     startX: number;
@@ -137,7 +162,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
       try {
         const data = await loadRealTestData();
         setTestData(data);
-        console.log(`儀表板資料載入完成: ${data.length} 筆記錄`);
+        console.log(`📈 儀表板資料載入完成: ${data.length} 筆記錄`);
       } catch (error) {
         console.error('載入儀表板資料失敗:', error);
         setTestData([]);
@@ -150,11 +175,11 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
   // 監聽資料更新
   useEffect(() => {
     const handleDataUpdate = async () => {
-      console.log('儀表板收到資料更新事件...');
+      console.log('🔄 儀表板收到資料更新事件...');
       try {
         const data = await loadRealTestData();
         setTestData(data);
-        console.log(`儀表板資料已更新: ${data.length} 筆記錄`);
+        console.log(`📈 儀表板資料已更新: ${data.length} 筆記錄`);
       } catch (error) {
         console.error('儀表板資料更新失敗:', error);
       }
@@ -283,7 +308,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
       // 生成失敗原因顯示
       const failureReason = uniqueFailedItems.length > 0
         ? uniqueFailedItems.join(', ')
-        : t('test.failed');
+        : '測試失敗';
 
       retestData.push({
         ...lastRecord,
@@ -298,7 +323,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
 
     // 按複測次數排序（次數多的在前）
     return retestData.sort((a, b) => b.retestCount - a.retestCount);
-  }, [filteredData, t]);
+  }, [filteredData]);
 
   // 計算站別統計資料 (用於詳細統計表格)
   const detailedStationStats = useMemo(() => {
@@ -517,7 +542,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
 
       const intervalText = diffDays === 1
         ? `${formatDate(startDate)}`
-        : `${formatDate(startDate)} - ${formatDate(endDate)} (${diffDays}${t('days.suffix')})`;
+        : `${formatDate(startDate)} - ${formatDate(endDate)} (${diffDays}天)`;
 
       return {
         startDate,
@@ -592,9 +617,9 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
   // MES 統計卡片數據
   const data: StatCardProps[] = [
     {
-      title: t('total.test.count'),
+      title: "總測試數",
       value: stats.total.toLocaleString(),
-      subtitle: `${t('device.count')}: ${stats.deviceCount}`,
+      subtitle: `設備數量: ${stats.deviceCount}`,
       interval: dateRangeInfo.intervalText,
       trend: "up",
       icon: <AssessmentIcon />,
@@ -606,9 +631,9 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
       },
     },
     {
-      title: t('test.pass.rate'),
+      title: "測試良率",
       value: stats.passRateText,
-      subtitle: `${t('pass')}: ${stats.passed} / ${t('fail')}: ${stats.failed}`,
+      subtitle: `通過: ${stats.passed} / 失敗: ${stats.failed}`,
       interval: dateRangeInfo.intervalText,
       trend: stats.trend as "up" | "down" | "neutral",
       trendValue: stats.trendValue,
@@ -621,9 +646,9 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
       },
     },
     {
-      title: t('production.yield.rate'),
+      title: "生產良率",
       value: stats.productionYieldRateText,
-      subtitle: `${t('completed')}: ${stats.passedDeviceCount} / ${t('total')}: ${stats.deviceCount}`,
+      subtitle: `完成: ${stats.passedDeviceCount} / 總數: ${stats.deviceCount}`,
       interval: dateRangeInfo.intervalText,
       trend: "up",
       icon: <MemoryIcon />,
@@ -635,10 +660,10 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
       },
     },
     {
-      title: t('retest.count'),
+      title: "復測數量",
       value: stats.retestCount.toLocaleString(),
       interval: dateRangeInfo.intervalText,
-      subtitle: `${t('retest.count')}: ${stats.retestCount.toLocaleString()}`,
+      subtitle: `複測數量: ${stats.retestCount.toLocaleString()}`,
       trend: "down",
       icon: <ErrorIcon />,
       color: 'warning',
@@ -751,7 +776,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
   const handleExport = () => {
     // 匯出CSV功能
     const csvContent = [
-      [t('serial.number'), t('work.order'), t('station'), t('model'), t('result'), t('test.time'), t('tester')].join(','),
+      ['序號', '工單', '站別', '機種', '結果', '測試時間', '測試員'].join(','),
       ...filteredData.map(record => [
         record.serialNumber,
         record.workOrder,
@@ -867,15 +892,15 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             onClick={() => setCurrentView('dashboard')}
           >
             <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            {t('home')}
+            首頁
           </Link>
           <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
-            {t('dashboard')}
+            儀表板
           </Typography>
         </Breadcrumbs>
 
         <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600, mb: 0 }}>
-          {t('mes.dashboard.title')}
+          MES 數據監控儀表板
         </Typography>
       </Box>
 
@@ -895,7 +920,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             startIcon={<FileDownloadIcon />}
             onClick={openExportMenu}
           >
-            {t('export')}
+            匯出
           </Button>
           <Menu
             anchorEl={exportAnchorEl}
@@ -904,8 +929,8 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             transformOrigin={{ vertical: 'top', horizontal: 'right' }}
           >
-            <MenuItem onClick={() => handleExportFormat('csv')}>{t('csv.export')}</MenuItem>
-            <MenuItem onClick={() => handleExportFormat('json')}>{t('json.export')}</MenuItem>
+            <MenuItem onClick={() => handleExportFormat('csv')}>CSV 匯出</MenuItem>
+            <MenuItem onClick={() => handleExportFormat('json')}>JSON 匯出</MenuItem>
           </Menu>
         </Stack>
       </Box>
@@ -937,7 +962,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {t('station.performance.stats')}
+                  各站點測試表現統計
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <VisibilityIcon fontSize="small" />
@@ -1005,7 +1030,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {t('station.test.count')}
+                  站別測試數量
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <VisibilityIcon fontSize="small" />
@@ -1028,7 +1053,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                     label: '',
                     max: Math.max(...dailySeriesData.totalTests) * 1.2
                   }]}
-                  series={[
+                  series={[ 
                     {
                       data: dailySeriesData.totalTests.map(total => Math.floor(total * 0.4)),
                       label: 'ST1.large',
@@ -1104,7 +1129,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {t('station.performance.table')}
+                  站別表現統計
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <VisibilityIcon fontSize="small" />
@@ -1115,10 +1140,10 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell>{t('station')}</TableCell>
-                        <TableCell align="center">{t('total')}</TableCell>
-                        <TableCell align="center">{t('pass.rate')}</TableCell>
-                        <TableCell align="center">{t('status')}</TableCell>
+                        <TableCell>站別</TableCell>
+                        <TableCell align="center">總數</TableCell>
+                        <TableCell align="center">通過率</TableCell>
+                        <TableCell align="center">狀態</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1126,7 +1151,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                         const passRate = stationData.total > 0 ?
                           ((stationData.total - stationData.failed) / stationData.total * 100) : 0;
                         const status = passRate >= 95 ? 'excellent' : passRate >= 85 ? 'good' : passRate >= 70 ? 'warning' : 'critical';
-                        const statusText = status === 'excellent' ? t('excellent') : status === 'good' ? t('good') : status === 'warning' ? t('warning') : t('critical');
+                        const statusText = status === 'excellent' ? '優秀' : status === 'good' ? '良好' : status === 'warning' ? '警告' : '異常';
                         const statusColor = status === 'excellent' ? 'success' : status === 'good' ? 'info' : status === 'warning' ? 'warning' : 'error';
 
                         return (
@@ -1199,7 +1224,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {t('model.test.statistics')}
+                  機種測試統計
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <MemoryIcon fontSize="small" />
@@ -1210,10 +1235,10 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell>{t('model')}</TableCell>
-                        <TableCell align="center">{t('test.count')}</TableCell>
-                        <TableCell align="center">{t('pass.count')}</TableCell>
-                        <TableCell align="center">{t('pass.rate')}</TableCell>
+                        <TableCell>機種</TableCell>
+                        <TableCell align="center">測試數量</TableCell>
+                        <TableCell align="center">通過數量</TableCell>
+                        <TableCell align="center">通過率</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1286,7 +1311,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {t('failure.analysis')}
+                  失敗原因分析
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <ErrorIcon fontSize="small" />
@@ -1298,11 +1323,11 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow>
-                          <TableCell>{t('test.item.name')}</TableCell>
-                          <TableCell align="center">{t('failure.count')}</TableCell>
-                          <TableCell align="center">{t('total.test.count')}</TableCell>
-                          <TableCell align="center">{t('failure.rate')}</TableCell>
-                          <TableCell>{t('distribution')}</TableCell>
+                          <TableCell>測項名稱</TableCell>
+                          <TableCell align="center">失敗次數</TableCell>
+                          <TableCell align="center">總測試次數</TableCell>
+                          <TableCell align="center">失敗率</TableCell>
+                          <TableCell>分佈</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1354,7 +1379,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                 ) : (
                   <Box display="flex" alignItems="center" justifyContent="center" height="100%">
                     <Typography variant="body2" color="text.secondary">
-                      {t('no.failure.data')}
+                      目前沒有失敗測項資料
                     </Typography>
                   </Box>
                 )}
@@ -1393,7 +1418,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  {t('retest.statistics')}
+                  復測統計分析
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <TrendingUpIcon fontSize="small" />
@@ -1405,12 +1430,12 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow>
-                          <TableCell>{t('station')}</TableCell>
-                          <TableCell align="center">{t('original.test')}</TableCell>
-                          <TableCell align="center">{t('retest.count')}</TableCell>
-                          <TableCell align="center">{t('retest.rate')}</TableCell>
-                          <TableCell align="center">{t('retest.pass')}</TableCell>
-                          <TableCell align="center">{t('retest.pass.rate')}</TableCell>
+                          <TableCell>站別</TableCell>
+                          <TableCell align="center">原始測試</TableCell>
+                          <TableCell align="center">復測次數</TableCell>
+                          <TableCell align="center">復測率</TableCell>
+                          <TableCell align="center">復測通過</TableCell>
+                          <TableCell align="center">復測通過率</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1464,7 +1489,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                 ) : (
                   <Box display="flex" alignItems="center" justifyContent="center" height="100%">
                     <Typography variant="body2" color="text.secondary">
-                      {t('no.retest.data')}
+                      目前沒有復測資料
                     </Typography>
                   </Box>
                 )}
@@ -1513,7 +1538,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                 </Typography>
                 <Box display="flex" alignItems="center" gap={2}>
                   <Typography variant="body2" color="text.secondary">
-                    {t('showing')} {Math.min(10, filteredData.length)} / {filteredData.length} {t('records')}
+                    顯示 {Math.min(10, filteredData.length)} / {filteredData.length} 筆記錄
                   </Typography>
                   <Button
                     variant="text"
@@ -1540,12 +1565,12 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>{t('serial.number')}</TableCell>
-                        <TableCell>{t('station')}</TableCell>
-                        <TableCell>{t('model')}</TableCell>
-                        <TableCell>{t('result')}</TableCell>
-                        <TableCell>{t('time')}</TableCell>
-                        <TableCell>{t('tester')}</TableCell>
+                        <TableCell>序號</TableCell>
+                        <TableCell>站別</TableCell>
+                        <TableCell>機種</TableCell>
+                        <TableCell>結果</TableCell>
+                        <TableCell>時間</TableCell>
+                        <TableCell>測試員</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>

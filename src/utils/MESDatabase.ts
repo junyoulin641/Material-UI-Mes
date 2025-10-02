@@ -276,18 +276,38 @@ export class MESDatabase {
   }
 }
 
-// 建立全域實例
-let mesDB: MESDatabase | null = null;
+// Singleton instance management
+let instance: MESDatabase | null = null;
+let initializingPromise: Promise<MESDatabase> | null = null;
 
 export const getMESDatabase = async (): Promise<MESDatabase> => {
-  if (!mesDB) {
-    mesDB = new MESDatabase();
-    await mesDB.init();
-
-    // 將實例暴露到全域供其他組件使用
-    (window as any).mesDB = mesDB;
+  // If instance exists, return it immediately.
+  if (instance) {
+    return instance;
   }
-  return mesDB;
+
+  // If initialization is already in progress, wait for it to complete.
+  if (initializingPromise) {
+    return initializingPromise;
+  }
+
+  // Start initialization
+  initializingPromise = (async () => {
+    try {
+      const db = new MESDatabase();
+      await db.init();
+      instance = db;
+      (window as any).mesDB = instance; // Optional: expose to window for debugging
+      return instance;
+    } catch (error) {
+      console.error("Failed to initialize MESDatabase:", error);
+      // Reset promise so that next call can retry.
+      initializingPromise = null;
+      throw error;
+    }
+  })();
+
+  return initializingPromise;
 };
 
 export default MESDatabase;

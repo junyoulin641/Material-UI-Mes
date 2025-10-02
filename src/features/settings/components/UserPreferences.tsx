@@ -225,24 +225,6 @@ export default function UserPreferences({ open, onClose, onSave }: UserPreferenc
               iconPosition="start"
               sx={{ minHeight: 60 }}
             />
-            <Tab
-              icon={<DashboardIcon />}
-              label={t('dashboard')}
-              iconPosition="start"
-              sx={{ minHeight: 60 }}
-            />
-            <Tab
-              icon={<ViewListIcon />}
-              label={t('table.settings')}
-              iconPosition="start"
-              sx={{ minHeight: 60 }}
-            />
-            <Tab
-              icon={<NotificationsIcon />}
-              label={t('notification.settings')}
-              iconPosition="start"
-              sx={{ minHeight: 60 }}
-            />
           </Tabs>
         </Box>
 
@@ -294,8 +276,8 @@ export default function UserPreferences({ open, onClose, onSave }: UserPreferenc
                     label={t('language.label')}
                     onChange={(e) => setLanguage(e.target.value as any)}
                   >
-                    <MenuItem value="zh-TW">🇹🇼 繁體中文</MenuItem>
-                    <MenuItem value="en-US">🇺🇸 English</MenuItem>
+                    <MenuItem value="zh-TW">繁體中文</MenuItem>
+                    <MenuItem value="en-US">English</MenuItem>
                   </Select>
                 </FormControl>
               </Grid>

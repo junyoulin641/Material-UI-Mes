@@ -1,11 +1,8 @@
 import * as React from 'react';
 import { createContext, useContext, useState, useCallback } from 'react';
 import {
-  Snackbar,
   Alert,
   AlertTitle,
-  Slide,
-  SlideProps,
 } from '@mui/material';
 
 export type ToastType = 'success' | 'error' | 'warning' | 'info';
@@ -29,11 +26,6 @@ interface ToastContextType {
 }
 
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
-
-// 滑動動畫
-function SlideTransition(props: SlideProps) {
-  return <Slide {...props} direction="up" />;
-}
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -104,40 +96,40 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }}>
       {children}
 
-      {/* 渲染 Toast 通知 */}
-      {toasts.map((toast, index) => (
-        <Snackbar
-          key={toast.id}
-          open={true}
-          onClose={() => handleClose(toast.id)}
-          TransitionComponent={SlideTransition}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-          sx={{
-            position: 'fixed',
-            top: 16 + index * 80, // 多個 toast 堆疊顯示
-            right: 16,
-            zIndex: 9999,
-          }}
-        >
-          <Alert
-            onClose={() => handleClose(toast.id)}
-            severity={toast.type}
-            variant="outlined"
-            sx={{
-              minWidth: 300,
-              maxWidth: 500,
-              '& .MuiAlert-message': {
-                width: '100%',
-              },
-            }}
-          >
-            {toast.title && (
-              <AlertTitle>{toast.title}</AlertTitle>
-            )}
-            {toast.message}
-          </Alert>
-        </Snackbar>
-      ))}
+      {/* 渲染 Toast 通知 - 垂直堆疊避免重疊 */}
+      <div style={{
+        position: 'fixed',
+        top: 16,
+        right: 16,
+        zIndex: 9999,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px',
+        pointerEvents: 'none',
+      }}>
+        {toasts.map((toast) => (
+          <div key={toast.id} style={{ pointerEvents: 'auto' }}>
+            <Alert
+              onClose={() => handleClose(toast.id)}
+              severity={toast.type}
+              variant="filled"
+              sx={{
+                minWidth: 300,
+                maxWidth: 500,
+                boxShadow: 3,
+                '& .MuiAlert-message': {
+                  width: '100%',
+                },
+              }}
+            >
+              {toast.title && (
+                <AlertTitle>{toast.title}</AlertTitle>
+              )}
+              {toast.message}
+            </Alert>
+          </div>
+        ))}
+      </div>
     </ToastContext.Provider>
   );
 }

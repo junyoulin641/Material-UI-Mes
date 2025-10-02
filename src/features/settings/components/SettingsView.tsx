@@ -532,7 +532,7 @@ export function SystemSettings() {
       }));
 
       showSuccess(t('data.cleared.success', { count: mesKeys.length }), t('system.reset'));
-      console.log('🚀 系統已完全清空，準備測試實際資料載入');
+      console.log('系統已完全清空，準備測試實際資料載入');
     } catch (error) {
       console.error('清空資料時發生錯誤:', error);
       showError(t('data.clear.error'), t('operation.failed'));
@@ -736,7 +736,7 @@ export function SystemSettings() {
                 </Typography>
               </Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                {t('system.management.description')}
+                {t('system.management')}
               </Typography>
 
               <Stack spacing={2}>

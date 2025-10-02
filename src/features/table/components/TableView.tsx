@@ -451,18 +451,18 @@ export default function EnhancedTableView({
             onClick={() => setCurrentView('dashboard')}
           >
             <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            首頁
+            {t('home')}
           </Link>
           <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
-            測試記錄
+            {t('table.title')}
           </Typography>
         </Breadcrumbs>
 
         <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
-           {title}
+           {t('table.title')}
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          查看和管理所有製造測試記錄，支援進階篩選和資料匯出功能
+          {t('view.all.records')}
         </Typography>
       </Box>
 
@@ -472,7 +472,7 @@ export default function EnhancedTableView({
           <Box mb={2}>
             <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <FilterListIcon />
-              資料篩選
+              {t('quick.filters')}
             </Typography>
           </Box>
 
@@ -481,8 +481,8 @@ export default function EnhancedTableView({
               <TextField
                 fullWidth
                 size="small"
-                label="序號關鍵字"
-                placeholder="輸入序號..."
+                label={t('serial.number.search')}
+                placeholder={t('enter.serial.number')}
                 value={filters.serial}
                 onChange={(e) => setFilters(prev => ({ ...prev, serial: e.target.value }))}
               />
@@ -490,13 +490,13 @@ export default function EnhancedTableView({
 
             <Grid size={{ xs: 12, sm: 6, md: 2 }}>
               <FormControl fullWidth size="small">
-                <InputLabel>站別</InputLabel>
+                <InputLabel>{t('station')}</InputLabel>
                 <Select
                   value={filters.station}
-                  label="站別"
+                  label={t('station')}
                   onChange={(e) => setFilters(prev => ({ ...prev, station: e.target.value }))}
                 >
-                  <MenuItem value="">全部站別</MenuItem>
+                  <MenuItem value="">{t('all')}</MenuItem>
                   {configuredStations.map((station) => (
                     <MenuItem key={station} value={station}>
                       {station}
@@ -508,13 +508,13 @@ export default function EnhancedTableView({
 
             <Grid size={{ xs: 12, sm: 6, md: 2 }}>
               <FormControl fullWidth size="small">
-                <InputLabel>機種</InputLabel>
+                <InputLabel>{t('model')}</InputLabel>
                 <Select
                   value={filters.model}
-                  label="機種"
+                  label={t('model')}
                   onChange={(e) => setFilters(prev => ({ ...prev, model: e.target.value }))}
                 >
-                  <MenuItem value="">全部機種</MenuItem>
+                  <MenuItem value="">{t('all')}</MenuItem>
                   {configuredModels.map((model) => (
                     <MenuItem key={model} value={model}>
                       {model}
@@ -526,13 +526,13 @@ export default function EnhancedTableView({
 
             <Grid size={{ xs: 12, sm: 6, md: 2 }}>
               <FormControl fullWidth size="small">
-                <InputLabel>結果</InputLabel>
+                <InputLabel>{t('result')}</InputLabel>
                 <Select
                   value={filters.result}
-                  label="結果"
+                  label={t('result')}
                   onChange={(e) => setFilters(prev => ({ ...prev, result: e.target.value }))}
                 >
-                  <MenuItem value="">全部結果</MenuItem>
+                  <MenuItem value="">{t('all')}</MenuItem>
                   <MenuItem value="PASS">PASS</MenuItem>
                   <MenuItem value="FAIL">FAIL</MenuItem>
                 </Select>
@@ -544,7 +544,7 @@ export default function EnhancedTableView({
                 fullWidth
                 size="small"
                 type="date"
-                label="開始日期"
+                label={t('date.from')}
                 InputLabelProps={{ shrink: true }}
                 value={filters.dateFrom}
                 onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
@@ -556,7 +556,7 @@ export default function EnhancedTableView({
                 fullWidth
                 size="small"
                 type="date"
-                label="結束日期"
+                label={t('date.to')}
                 InputLabelProps={{ shrink: true }}
                 value={filters.dateTo}
                 onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
@@ -609,7 +609,7 @@ export default function EnhancedTableView({
         }}
       >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">測試記錄詳情</Typography>
+          <Typography variant="h6">{t('test.detail.info')}</Typography>
           <IconButton onClick={() => setPreviewOpen(false)} size="small">
             ✕
           </IconButton>
@@ -619,36 +619,36 @@ export default function EnhancedTableView({
           {selectedRow && (
             <Grid container spacing={2}>
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="subtitle2">序號</Typography>
+                <Typography variant="subtitle2">{t('serial.number')}</Typography>
                 <Typography variant="body1" sx={{ fontFamily: 'monospace', mb: 2 }}>
                   {selectedRow.serialNumber}
                 </Typography>
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="subtitle2">工單</Typography>
+                <Typography variant="subtitle2">{t('work.order')}</Typography>
                 <Typography variant="body1" sx={{ fontFamily: 'monospace', mb: 2 }}>
                   {selectedRow.workOrder}
                 </Typography>
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="subtitle2">料號</Typography>
+                <Typography variant="subtitle2">{t('part.number')}</Typography>
                 <Chip label={selectedRow.partNumber} size="small" color="secondary" variant="outlined" sx={{ mb: 2 }} />
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="subtitle2">站別</Typography>
+                <Typography variant="subtitle2">{t('station')}</Typography>
                 <Chip label={selectedRow.station} size="small" variant="outlined" sx={{ mb: 2 }} />
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="subtitle2">機種</Typography>
+                <Typography variant="subtitle2">{t('model')}</Typography>
                 <Chip label={selectedRow.model} size="small" color="primary" variant="outlined" sx={{ mb: 2 }} />
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="subtitle2">測試結果</Typography>
+                <Typography variant="subtitle2">{t('result')}</Typography>
                 <Chip
                   label={selectedRow.result}
                   size="small"
@@ -659,28 +659,28 @@ export default function EnhancedTableView({
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="subtitle2">測試時間</Typography>
+                <Typography variant="subtitle2">{t('test.time')}</Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
                   {new Date(selectedRow.testTime).toLocaleString()}
                 </Typography>
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="subtitle2">測試員</Typography>
+                <Typography variant="subtitle2">{t('tester')}</Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
                   {selectedRow.tester}
                 </Typography>
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
-                <Typography variant="subtitle2">測試時長</Typography>
+                <Typography variant="subtitle2">{t('test.duration')}</Typography>
                 <Typography variant="body1" sx={{ mb: 2 }}>
                   {selectedRow.testDuration} 秒
                 </Typography>
               </Grid>
 
               <Grid size={12}>
-                <Typography variant="subtitle2" sx={{ mb: 1 }}>測試項目</Typography>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>{t('test.items')}</Typography>
                 <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                   {selectedRow.items?.map((item: any, index: number) => (
                     <Chip
