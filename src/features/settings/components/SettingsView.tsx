@@ -178,8 +178,24 @@ interface LogFile {
 }
 
 export function SystemSettings() {
-  const [stations, setStations] = useState<string[]>([]);
-  const [models, setModels] = useState<string[]>([]);
+  // 從 localStorage 載入站別和機種配置
+  const [stations, setStations] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('mesStations');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [models, setModels] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('mesModels');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [newStation, setNewStation] = useState('');
   const [newModel, setNewModel] = useState('');
   const [isImporting, setIsImporting] = useState(false);
@@ -306,13 +322,41 @@ export function SystemSettings() {
 
           // 處理每一筆正規化的記錄 - 使用原始MES系統的欄位名稱
           for (const normalizedData of normalizedRecords) {
+            // 時間處理：直接使用原始時間字串，不做時區轉換
+            let testTime = normalizedData.datetime || '';
+            if (!testTime) {
+              // 如果沒有時間，嘗試從檔名解析（格式：20250920-063924-序號.json）
+              const timeMatch = jsonFile.name.match(/(\d{8})-(\d{6})/);
+              if (timeMatch) {
+                const [, dateStr, timeStr] = timeMatch;
+                // 轉換為 YYYY-MM-DD HH:MM:SS 格式
+                const year = dateStr.slice(0, 4);
+                const month = dateStr.slice(4, 6);
+                const day = dateStr.slice(6, 8);
+                const hour = timeStr.slice(0, 2);
+                const minute = timeStr.slice(2, 4);
+                const second = timeStr.slice(4, 6);
+                testTime = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+              } else {
+                // 最後備援：使用當前時間（本地時區）
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hour = String(now.getHours()).padStart(2, '0');
+                const minute = String(now.getMinutes()).padStart(2, '0');
+                const second = String(now.getSeconds()).padStart(2, '0');
+                testTime = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+              }
+            }
+
             const record: DBTestRecord = {
               serialNumber: normalizedData.serial || '',  // 原始MES使用 'serial'
               workOrder: normalizedData.workOrder || '',
               station: normalizedData.station || '',
               model: normalizedData.model || '',
               result: normalizedData.result as 'PASS' | 'FAIL',
-              testTime: normalizedData.datetime || new Date().toISOString(),  // 原始MES使用 'datetime'
+              testTime: testTime,  // 使用處理後的本地時間字串
               tester: normalizedData.Tester || '',  // 原始MES使用 'Tester' (大寫T)
               partNumber: normalizedData.FN || '',  // 原始MES使用 'FN'
               items: Array.isArray(normalizedData.Items) ? normalizedData.Items.map(item => ({  // 原始MES使用 'Items'
@@ -499,14 +543,20 @@ export function SystemSettings() {
       await db.clearAllData();
       console.log('✅ IndexedDB 資料已清空');
 
-      // 清空所有相關的 localStorage 項目
+      // 保存站別和機種配置
+      const savedStations = localStorage.getItem('mesStations');
+      const savedModels = localStorage.getItem('mesModels');
+
+      // 清空所有相關的 localStorage 項目（排除站別和機種）
       const keys = Object.keys(localStorage);
       const mesKeys = keys.filter(key =>
-        key.startsWith('mes') ||
+        (key.startsWith('mes') ||
         key.startsWith('log_') ||
         key.includes('test') ||
         key.includes('Test') ||
-        key.includes('MES')
+        key.includes('MES')) &&
+        key !== 'mesStations' &&  // 保留站別配置
+        key !== 'mesModels'       // 保留機種配置
       );
 
       mesKeys.forEach(key => {
@@ -514,9 +564,15 @@ export function SystemSettings() {
         console.log(`🗑️ 清除 localStorage: ${key}`);
       });
 
-      // 重置狀態
-      setStations([]);
-      setModels([]);
+      // 恢復站別和機種配置
+      if (savedStations) {
+        localStorage.setItem('mesStations', savedStations);
+      }
+      if (savedModels) {
+        localStorage.setItem('mesModels', savedModels);
+      }
+
+      // 重置狀態（不重置站別和機種）
       setLogMappings(new Map());
       setImportResults(null);
 

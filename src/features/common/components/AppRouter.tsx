@@ -13,6 +13,7 @@ import {
   PrecisionManufacturing as PrecisionManufacturingIcon,
   HelpOutlineRounded as HelpIcon,
   HomeRounded as HomeIcon,
+  Replay as RetestIcon,
 } from '@mui/icons-material';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
@@ -24,8 +25,9 @@ import MTCCTView from '../../mtcct/components/MTCCTView';
 import AIAnalysisView from '../../ai-analysis/components/AIAnalysisView';
 import SettingsView from '../../settings/components/SettingsView';
 import UserPreferences from '../../settings/components/UserPreferences';
+import RetestListView from '../../retest/components/RetestListView';
 
-export type ViewType = 'dashboard' | 'table' | 'logs' | 'mtcct' | 'ai' | 'settings' | 'help';
+export type ViewType = 'dashboard' | 'table' | 'logs' | 'mtcct' | 'ai' | 'retest' | 'settings' | 'help';
 
 interface NavigationContextType {
   currentView: ViewType;
@@ -75,6 +77,7 @@ export function AppRouter({ children }: AppRouterProps) {
   const mainListItems = [
     { id: 'dashboard' as ViewType, label: t('dashboard'), icon: <DashboardIcon /> },
     { id: 'table' as ViewType, label: t('test.records'), icon: <TableIcon /> },
+    { id: 'retest' as ViewType, label: t('retest.details'), icon: <RetestIcon /> },
     { id: 'logs' as ViewType, label: t('log.query'), icon: <LogIcon /> },
     { id: 'mtcct' as ViewType, label: t('mtcct.management'), icon: <MTCCTIcon /> },
     { id: 'ai' as ViewType, label: t('ai.analysis'), icon: <AIIcon /> },
@@ -95,6 +98,8 @@ export function AppRouter({ children }: AppRouterProps) {
         return <DashboardView />;
       case 'table':
         return <TableView />;
+      case 'retest':
+        return <RetestListView />;
       case 'logs':
         return <LogQueryView />;
       case 'mtcct':

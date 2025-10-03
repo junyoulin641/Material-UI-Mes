@@ -3,6 +3,195 @@
 ## 專案概述
 製造執行系統 (MES) - 基於 Material-UI v7 和 TypeScript 的現代化 Web 應用程式
 
+## 最新更新記錄 (2025-10-02)
+
+### KPI 計算修復與熱力圖優化
+
+#### KPI 卡片計算邏輯修復
+- **修復「全站別模式」錯誤**: 原本邏輯會檢查設備是否通過資料集中的所有站別，導致錯誤的 0.0% 良率
+- **正確邏輯**: 只檢查設備實際測試過的站別，每個站別取最後一筆測試結果
+- **修復結果**: 測試良率和生產良率現在正確顯示實際數值
+- **相關檔案**: `src/features/dashboard/utils/calculations.ts` (lines 51-85)
+
+#### 儀表板多語言支援完善
+- **修復翻譯問題**: 所有硬編碼的中文字串改用 `t()` 翻譯函數
+- **涵蓋範圍**:
+  - KPI 卡片標題和副標題（總測試數、測試良率、生產良率、復測次數）
+  - 站別表現統計表格標題
+  - 復測統計表格標題和欄位
+- **新增翻譯鍵**:
+  - `passed.devices`, `total.devices`, `pass.rate`, `passed.count`
+  - `retest.pass.rate`, `daily.station.pass.rate.heatmap`, `no.data`
+- **相關檔案**:
+  - `src/features/dashboard/components/DashboardView.tsx` (lines 100-161, 924, 936-941)
+  - `src/contexts/LanguageContext.tsx`
+
+#### 每日站別良率熱力圖
+- **新增視覺化圖表**: 取代原本的折線圖，使用熱力圖展示每日各站別良率
+- **色彩編碼系統**:
+  - 紅色 (#ef4444): 0-60% 良率
+  - 橙色 (#f59e0b): 61-80% 良率
+  - 淺綠 (#84cc16): 81-90% 良率
+  - 深綠 (#10b981): 91-100% 良率
+  - 灰色 (#e5e7eb): 無測試數據
+- **數據處理優化**:
+  - 無測試日期顯示為 `null` 而非 `0%`，避免誤導
+  - 灰色格子顯示 "-" 表示該日無數據
+  - 滑鼠懸停顯示完整資訊（站別 + 良率%）
+- **UI 優化**:
+  - 緊湊型設計：格子 40px 寬、2px 內距、0.6rem 字體
+  - 懸停放大效果和過渡動畫
+  - 全寬顯示（占整行）
+  - 響應式水平滾動支援
+- **相關檔案**:
+  - `src/features/dashboard/utils/calculations.ts` (lines 451-497) - 計算函數
+  - `src/features/dashboard/hooks/useDashboardData.ts` (line 141) - Hook 整合
+  - `src/features/dashboard/components/DashboardView.tsx` (lines 701-824) - UI 實作
+
+#### StatCard 組件簡化
+- **移除趨勢 Chip**: 移除卡片右上角的百分比趨勢標籤，簡化視覺呈現
+- **相關檔案**: `src/features/dashboard/components/StatCard.tsx` (lines 227-234)
+
+#### 佈局優化
+- **熱力圖位置調整**: 從「站別表現統計」後移至「機種測試統計」後
+- **卡片寬度調整**: 從 50% 改為 100% 全寬顯示
+- **移除拖曳功能**: 固定熱力圖佈局，避免顯示問題
+
+---
+
+### Dashboard UI/邏輯分離重構完成
+
+#### 重構內容
+- **完成 DashboardView.tsx 重構**: 移除所有業務邏輯（約700行），僅保留 UI 渲染程式碼
+- **使用 useDashboardData Hook**: 一次性取得所有儀表板需要的資料
+- **新增計算函數**:
+  - `calculateFailureReasons()` - 失敗原因分析
+  - `calculateRetestStats()` - 復測統計數據
+- **移除重複程式碼**: 刪除 DashboardView.tsx 中的 chartData useMemo，改用 Hook 提供的 chartData
+- **型別定義優化**: StatCardProps 移至 types/index.ts，遵循架構原則
+
+#### 重構前後對比
+**重構前 DashboardView.tsx (約1500行)**:
+```typescript
+// ❌ 業務邏輯全部混在組件中
+const loadRealTestData = async () => { ... }  // 50行
+const generateMockData = () => { ... }        // 25行
+useEffect(() => { loadData() }, [])           // 30行
+useEffect(() => { handleDataUpdate() }, [])   // 30行
+const filteredData = useMemo(() => { ... })   // 50行
+const retestRecords = useMemo(() => { ... })  // 60行
+const detailedStationStats = useMemo(() => { ... })  // 25行
+const modelStats = useMemo(() => { ... })     // 35行
+const failureReasons = useMemo(() => { ... }) // 30行
+const retestStats = useMemo(() => { ... })    // 60行
+const stats = useMemo(() => { ... })          // 35行
+const dailySeriesData = useMemo(() => { ... }) // 50行
+const chartData = useMemo(() => { ... })      // 75行
+```
+
+**重構後 DashboardView.tsx (約1265行)**:
+```typescript
+// ✅ 一行程式碼取代所有業務邏輯
+const {
+  filteredData,
+  retestRecords,
+  detailedStationStats,
+  modelStats,
+  failureReasons,
+  retestStats,
+  stats,
+  dailySeriesData,
+  chartData,
+  dateRangeInfo,
+} = useDashboardData(dashboardFilters);
+```
+
+#### 架構優勢
+1. **關注點分離**: UI 組件只負責渲染，業務邏輯集中在 Hook
+2. **可測試性**: 計算函數都是純函數，易於單元測試
+3. **可重用性**: useDashboardData 可在其他組件中重用
+4. **可維護性**: 邏輯修改只需改 Hook 或 Utils，不影響 UI
+5. **型別安全**: TypeScript 介面定義清晰，IDE 提示完整
+
+#### 檔案結構
+```
+dashboard/
+├── components/
+│   └── DashboardView.tsx        # 純 UI 組件 (1265行)
+├── hooks/
+│   └── useDashboardData.ts      # 業務邏輯 Hook (158行)
+├── utils/
+│   └── calculations.ts          # 計算函數 (280行)
+└── types/
+    └── index.ts                 # 型別定義 (93行)
+```
+
+#### 技術實作細節
+**calculations.ts 新增函數**:
+```typescript
+// 失敗原因分析 - 統計測項失敗率
+export function calculateFailureReasons(records: TestRecord[]) {
+  const testItemStats = new Map<string, { total: number, failed: number }>();
+  // ... 統計邏輯
+  return Array.from(testItemStats.entries())
+    .map(([testName, stats]) => ({ reason, count, total, failureRate }))
+    .filter(item => item.count > 0)
+    .sort((a, b) => b.failureRate - a.failureRate)
+    .slice(0, 10);
+}
+
+// 復測統計 - 分析序號多次測試情況
+export function calculateRetestStats(records: TestRecord[]) {
+  const retestData = new Map<string, { originalCount, retestCount, finalPassCount }>();
+  // ... 分組和統計邏輯
+  return Array.from(retestData.entries())
+    .map(([station, data]) => ({ station, retestRate, retestPassRate, ... }))
+    .filter(item => item.retestCount > 0)
+    .sort((a, b) => b.retestRate - a.retestRate);
+}
+```
+
+**useDashboardData.ts 資料流程**:
+```typescript
+export function useDashboardData(filters: SimpleFilterOptions) {
+  // 1. 載入原始資料
+  useEffect(() => {
+    const db = await getMESDatabase();
+    const records = await db.getAllTestRecords();
+    setAllRecords(records);
+  }, []);
+
+  // 2. 根據篩選條件過濾
+  const filteredData = useMemo(() => { ... }, [allRecords, filters]);
+
+  // 3. 計算所有統計資料
+  const stats = useMemo(() => calculateKPI(filteredData), [filteredData]);
+  const detailedStationStats = useMemo(() => calculateStationStats(...), [...]);
+  const modelStats = useMemo(() => calculateModelStats(...), [...]);
+  const failureReasons = useMemo(() => calculateFailureReasons(filteredData), [filteredData]);
+  const retestStats = useMemo(() => calculateRetestStats(filteredData), [filteredData]);
+  const retestRecords = useMemo(() => calculateRetestRecords(filteredData), [filteredData]);
+  const dailySeriesData = useMemo(() => calculateDailyStats(...), [...]);
+
+  // 4. 返回所有計算結果
+  return { filteredData, stats, chartData, ... };
+}
+```
+
+#### 效能優化
+- **useMemo 快取**: 所有計算結果都使用 useMemo 快取，避免重複計算
+- **精確依賴**: 每個 useMemo 只依賴真正需要的資料，減少不必要的重新計算
+- **一次性載入**: 資料從 IndexedDB 載入一次，後續只做記憶體過濾和計算
+
+#### 未來擴展
+基於此架構可輕鬆擴展：
+- 新增更多統計維度：只需在 calculations.ts 加入新函數
+- 新增篩選條件：只需修改 useDashboardData 的過濾邏輯
+- 新增 KPI 卡片：只需在 DashboardView.tsx 的 data 陣列加入新項目
+- 建立其他 Dashboard：直接重用 useDashboardData Hook
+
+---
+
 ## 技術棧
 - **前端**: React 18 + TypeScript
 - **建構工具**: Vite

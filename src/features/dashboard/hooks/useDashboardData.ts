@@ -6,6 +6,8 @@ import {
   calculateStationStats,
   calculateModelStats,
   calculateDailyStats,
+  calculateDailyStationStats,
+  calculateDailyStationPassRates,
   calculateRetestRecords,
   calculateFailureReasons,
   calculateRetestStats,
@@ -55,13 +57,30 @@ export function useDashboardData(filters: SimpleFilterOptions) {
 
     // 日期篩選
     if (filters.dateFrom && filters.dateTo) {
-      const startDate = new Date(filters.dateFrom);
-      const endDate = new Date(filters.dateTo);
-      endDate.setHours(23, 59, 59, 999);
+      // 使用字串比較避免時區問題
+      const startDateStr = filters.dateFrom; // 格式: YYYY-MM-DD
+      const endDateStr = filters.dateTo;     // 格式: YYYY-MM-DD
 
       filtered = filtered.filter(record => {
-        const recordDate = new Date(record.testTime);
-        return recordDate >= startDate && recordDate <= endDate;
+        if (!record.testTime) return false;
+
+        // 從 testTime 取出日期部分 (YYYY-MM-DD)
+        // 支援多種格式: "2025-09-20 06:35:09" 或 "2025-09-20T06:35:09" 或 "2025-09-20T06:35:09.000Z"
+        let recordDateStr: string;
+
+        if (record.testTime.includes('T')) {
+          // ISO 8601 格式: "2025-09-20T06:35:09..." 或 "2025-09-19T22:35:09.000Z"
+          recordDateStr = record.testTime.split('T')[0];
+        } else if (record.testTime.includes(' ')) {
+          // 空格分隔格式: "2025-09-20 06:35:09"
+          recordDateStr = record.testTime.split(' ')[0];
+        } else {
+          // 只有日期: "2025-09-20"
+          recordDateStr = record.testTime.slice(0, 10);
+        }
+
+        // 字串比較 (YYYY-MM-DD 格式可以直接比較)
+        return recordDateStr >= startDateStr && recordDateStr <= endDateStr;
       });
     }
 
@@ -111,13 +130,15 @@ export function useDashboardData(filters: SimpleFilterOptions) {
   }, [filters.dateFrom, filters.dateTo]);
 
   // --- 所有統計資料計算 ---
-  const stats = useMemo(() => calculateKPI(filteredData), [filteredData]);
+  const stats = useMemo(() => calculateKPI(filteredData, filters.station), [filteredData, filters.station]);
   const detailedStationStats = useMemo(() => calculateStationStats(filteredData, configuredStations), [filteredData, configuredStations]);
   const modelStats = useMemo(() => calculateModelStats(filteredData, configuredModels), [filteredData, configuredModels]);
   const failureReasons = useMemo(() => calculateFailureReasons(filteredData), [filteredData]);
   const retestStats = useMemo(() => calculateRetestStats(filteredData), [filteredData]);
   const retestRecords = useMemo(() => calculateRetestRecords(filteredData), [filteredData]);
   const dailySeriesData = useMemo(() => calculateDailyStats(filteredData, dateRangeInfo), [filteredData, dateRangeInfo]);
+  const dailyStationData = useMemo(() => calculateDailyStationStats(filteredData, dateRangeInfo, configuredStations), [filteredData, dateRangeInfo, configuredStations]);
+  const dailyStationPassRates = useMemo(() => calculateDailyStationPassRates(filteredData, dateRangeInfo, configuredStations), [filteredData, dateRangeInfo, configuredStations]);
 
   // 圖表數據
   const chartData = useMemo(() => {
@@ -152,7 +173,12 @@ export function useDashboardData(filters: SimpleFilterOptions) {
     retestStats,
     stats,
     dailySeriesData,
+    dailyStationData,
+    dailyStationPassRates,
     chartData,
     dateRangeInfo,
+    // Configuration
+    configuredStations,
+    configuredModels,
   };
 }

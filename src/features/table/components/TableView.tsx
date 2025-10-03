@@ -18,6 +18,8 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Menu,
+  Stack,
 } from '@mui/material';
 import {
   DataGrid,
@@ -37,17 +39,19 @@ import {
   FilterList as FilterListIcon,
   Home as HomeIcon,
   NavigateNext as NavigateNextIcon,
+  FileDownload as FileDownloadIcon,
 } from '@mui/icons-material';
 import {
   Breadcrumbs,
   Link,
 } from '@mui/material';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useFilters } from '../../../contexts/FilterContext';
 import { getMESDatabase } from '../../../utils/MESDatabase';
 import { useNavigation } from '../../common/components/AppRouter';
 
 // 自定義工具欄
-function CustomToolbar({ onRefresh, onExport }: { onRefresh: () => void; onExport: () => void }) {
+function CustomToolbar({ onRefresh }: { onRefresh: () => void }) {
   return (
     <GridToolbarContainer>
       <GridToolbarColumnsButton />
@@ -130,10 +134,12 @@ export default function EnhancedTableView({
 }: EnhancedTableViewProps) {
   const { t } = useLanguage();
   const { setCurrentView } = useNavigation();
+  const { filters: globalFilters, setFilters: setGlobalFilters } = useFilters();
   const [data, setData] = useState<GridRowsProp>([]);
   const [loading, setLoading] = useState(false);
   const [selectedRow, setSelectedRow] = useState<any>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
 
   // 初始載入資料
   useEffect(() => {
@@ -190,15 +196,7 @@ export default function EnhancedTableView({
     };
   }, [data.length]);
 
-  // 篩選狀態
-  const [filters, setFilters] = useState({
-    serial: '',
-    station: '',
-    model: '',
-    result: '',
-    dateFrom: '',
-    dateTo: '',
-  });
+  // 使用全域篩選（從 FilterContext）
 
   // 從系統設定讀取站別和機種配置
   const configuredStations = useMemo(() => {
@@ -358,19 +356,49 @@ export default function EnhancedTableView({
     return baseColumns;
   }, [data]);
 
-  // 過濾資料
+  // 過濾資料（使用全域篩選）
   const filteredData = useMemo(() => {
     return data.filter(row => {
-      return (
-        (!filters.serial || row.serialNumber.toLowerCase().includes(filters.serial.toLowerCase())) &&
-        (!filters.station || row.station === filters.station) &&
-        (!filters.model || row.model === filters.model) &&
-        (!filters.result || row.result === filters.result) &&
-        (!filters.dateFrom || new Date(row.testTime) >= new Date(filters.dateFrom)) &&
-        (!filters.dateTo || new Date(row.testTime) <= new Date(filters.dateTo))
-      );
+      // 序號篩選
+      if (globalFilters.serialNumber && !row.serialNumber.toLowerCase().includes(globalFilters.serialNumber.toLowerCase())) {
+        return false;
+      }
+
+      // 站別篩選
+      if (globalFilters.station && row.station !== globalFilters.station) {
+        return false;
+      }
+
+      // 機種篩選
+      if (globalFilters.model && row.model !== globalFilters.model) {
+        return false;
+      }
+
+      // 結果篩選
+      if (globalFilters.result && globalFilters.result !== 'all' && row.result.toLowerCase() !== globalFilters.result.toLowerCase()) {
+        return false;
+      }
+
+      // 工單篩選
+      if (globalFilters.workOrder && !row.workOrder.toLowerCase().includes(globalFilters.workOrder.toLowerCase())) {
+        return false;
+      }
+
+      // 日期篩選
+      if (globalFilters.dateFrom && globalFilters.dateTo) {
+        const rowDate = new Date(row.testTime);
+        const startDate = new Date(globalFilters.dateFrom);
+        const endDate = new Date(globalFilters.dateTo);
+        endDate.setHours(23, 59, 59, 999);
+
+        if (rowDate < startDate || rowDate > endDate) {
+          return false;
+        }
+      }
+
+      return true;
     });
-  }, [data, filters]);
+  }, [data, globalFilters]);
 
   const handleRefresh = useCallback(async () => {
     setLoading(true);
@@ -384,7 +412,7 @@ export default function EnhancedTableView({
     }
   }, []);
 
-  const handleExport = useCallback(() => {
+  const handleExportCSV = useCallback(() => {
     const csvContent = [
       ['序號', '工單', '站別', '機種', '結果', '測試時間', '測試員'].join(','),
       ...filteredData.map(row => [
@@ -404,6 +432,26 @@ export default function EnhancedTableView({
     link.download = `MES_TestRecords_${new Date().toISOString().slice(0, 10)}.csv`;
     link.click();
   }, [filteredData]);
+
+  const handleExportJSON = useCallback(() => {
+    const blob = new Blob([JSON.stringify(filteredData, null, 2)], { type: 'application/json;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `MES_TestRecords_${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+  }, [filteredData]);
+
+  const openExportMenu = (e: React.MouseEvent<HTMLButtonElement>) => {
+    setExportAnchorEl(e.currentTarget);
+  };
+
+  const closeExportMenu = () => setExportAnchorEl(null);
+
+  const handleExportFormat = (format: 'csv' | 'json') => {
+    if (format === 'csv') handleExportCSV();
+    if (format === 'json') handleExportJSON();
+    closeExportMenu();
+  };
 
   const handleViewDetails = (row: any) => {
     setSelectedRow(row);
@@ -458,12 +506,37 @@ export default function EnhancedTableView({
           </Typography>
         </Breadcrumbs>
 
-        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
-           {t('table.title')}
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          {t('view.all.records')}
-        </Typography>
+        <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+          <Box>
+            <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600 }}>
+              {t('table.title')}
+            </Typography>
+            <Typography variant="body1" color="text.secondary">
+              {t('view.all.records')}
+            </Typography>
+          </Box>
+
+          {/* 匯出按鈕 */}
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Button
+              variant="contained"
+              startIcon={<FileDownloadIcon />}
+              onClick={openExportMenu}
+            >
+              {t('export')}
+            </Button>
+            <Menu
+              anchorEl={exportAnchorEl}
+              open={Boolean(exportAnchorEl)}
+              onClose={closeExportMenu}
+              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            >
+              <MenuItem onClick={() => handleExportFormat('csv')}>{t('export.csv')}</MenuItem>
+              <MenuItem onClick={() => handleExportFormat('json')}>{t('export.json')}</MenuItem>
+            </Menu>
+          </Stack>
+        </Box>
       </Box>
 
       {/* 進階篩選 */}
@@ -483,8 +556,8 @@ export default function EnhancedTableView({
                 size="small"
                 label={t('serial.number.search')}
                 placeholder={t('enter.serial.number')}
-                value={filters.serial}
-                onChange={(e) => setFilters(prev => ({ ...prev, serial: e.target.value }))}
+                value={globalFilters.serialNumber || ''}
+                onChange={(e) => setGlobalFilters({ ...globalFilters, serialNumber: e.target.value })}
               />
             </Grid>
 
@@ -492,9 +565,9 @@ export default function EnhancedTableView({
               <FormControl fullWidth size="small">
                 <InputLabel>{t('station')}</InputLabel>
                 <Select
-                  value={filters.station}
+                  value={globalFilters.station || ''}
                   label={t('station')}
-                  onChange={(e) => setFilters(prev => ({ ...prev, station: e.target.value }))}
+                  onChange={(e) => setGlobalFilters({ ...globalFilters, station: e.target.value })}
                 >
                   <MenuItem value="">{t('all')}</MenuItem>
                   {configuredStations.map((station) => (
@@ -510,9 +583,9 @@ export default function EnhancedTableView({
               <FormControl fullWidth size="small">
                 <InputLabel>{t('model')}</InputLabel>
                 <Select
-                  value={filters.model}
+                  value={globalFilters.model || ''}
                   label={t('model')}
-                  onChange={(e) => setFilters(prev => ({ ...prev, model: e.target.value }))}
+                  onChange={(e) => setGlobalFilters({ ...globalFilters, model: e.target.value })}
                 >
                   <MenuItem value="">{t('all')}</MenuItem>
                   {configuredModels.map((model) => (
@@ -528,13 +601,13 @@ export default function EnhancedTableView({
               <FormControl fullWidth size="small">
                 <InputLabel>{t('result')}</InputLabel>
                 <Select
-                  value={filters.result}
+                  value={globalFilters.result || 'all'}
                   label={t('result')}
-                  onChange={(e) => setFilters(prev => ({ ...prev, result: e.target.value }))}
+                  onChange={(e) => setGlobalFilters({ ...globalFilters, result: e.target.value })}
                 >
-                  <MenuItem value="">{t('all')}</MenuItem>
-                  <MenuItem value="PASS">PASS</MenuItem>
-                  <MenuItem value="FAIL">FAIL</MenuItem>
+                  <MenuItem value="all">{t('all')}</MenuItem>
+                  <MenuItem value="pass">PASS</MenuItem>
+                  <MenuItem value="fail">FAIL</MenuItem>
                 </Select>
               </FormControl>
             </Grid>
@@ -546,8 +619,8 @@ export default function EnhancedTableView({
                 type="date"
                 label={t('date.from')}
                 InputLabelProps={{ shrink: true }}
-                value={filters.dateFrom}
-                onChange={(e) => setFilters(prev => ({ ...prev, dateFrom: e.target.value }))}
+                value={globalFilters.dateFrom || ''}
+                onChange={(e) => setGlobalFilters({ ...globalFilters, dateFrom: e.target.value })}
               />
             </Grid>
 
@@ -558,8 +631,8 @@ export default function EnhancedTableView({
                 type="date"
                 label={t('date.to')}
                 InputLabelProps={{ shrink: true }}
-                value={filters.dateTo}
-                onChange={(e) => setFilters(prev => ({ ...prev, dateTo: e.target.value }))}
+                value={globalFilters.dateTo || ''}
+                onChange={(e) => setGlobalFilters({ ...globalFilters, dateTo: e.target.value })}
               />
             </Grid>
           </Grid>
@@ -584,7 +657,6 @@ export default function EnhancedTableView({
           slotProps={{
             toolbar: {
               onRefresh: handleRefresh,
-              onExport: handleExport,
             },
           }}
           checkboxSelection

@@ -231,11 +231,6 @@ export default function StatCard({
               <Typography variant="h4" component="p">
                 {value}
               </Typography>
-              {chip ? (
-                <Chip size="small" color={chip.color} label={chip.label} />
-              ) : (
-                <Chip size="small" color={chipColor} label={displayTrendValue} />
-              )}
             </Stack>
             {subtitle && (
               <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5 }}>

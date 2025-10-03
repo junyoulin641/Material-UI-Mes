@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid';
@@ -30,7 +30,8 @@ import DialogActions from '@mui/material/DialogActions';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import HomeIcon from '@mui/icons-material/Home';
 import InfoIcon from '@mui/icons-material/Info';
-import StatCard, { StatCardProps } from './StatCard';
+import StatCard from './StatCard';
+import type { StatCardProps } from '../types';
 import SimpleQuickFilters, { SimpleFilterOptions } from './SimpleQuickFilters';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import VisibilityIcon from '@mui/icons-material/Visibility';
@@ -43,85 +44,9 @@ import { PieChart } from '@mui/x-charts/PieChart';
 import { BarChart } from '@mui/x-charts/BarChart';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { useLanguage } from '../../../contexts/LanguageContext';
-import { getMESDatabase } from '../../../utils/MESDatabase';
+import { useFilters } from '../../../contexts/FilterContext';
 import { useNavigation } from '../../common/components/AppRouter';
-
-// 從 IndexedDB 載入實際測試數據
-const loadRealTestData = async () => {
-  try {
-    // 優先從 IndexedDB 載入
-    const db = await getMESDatabase();
-    const records = await db.getAllTestRecords();
-
-    if (records.length > 0) {
-      console.log(`✅ 儀表板從 IndexedDB 載入 ${records.length} 筆記錄`);
-      return records.map((record, index) => ({
-        id: record.id || index + 1,
-        serialNumber: record.serialNumber || '',
-        workOrder: record.workOrder || '',
-        station: record.station || '',
-        model: record.model || '',
-        result: record.result || 'FAIL',
-        testTime: record.testTime || new Date().toISOString(),
-        tester: record.tester || 'Unknown',
-        partNumber: record.partNumber || '',
-        items: record.items || [],
-      }));
-    }
-  } catch (error) {
-    console.error('從 IndexedDB 載入資料失敗，嘗試 localStorage:', error);
-  }
-
-  // 備援：從 localStorage 載入
-  try {
-    const storedData = localStorage.getItem('mesTestData');
-    if (storedData) {
-      const parsedData = JSON.parse(storedData);
-      console.log(`📦 儀表板從 localStorage 載入 ${parsedData.length} 筆記錄`);
-      return parsedData.map((record: any, index: number) => ({
-        id: index + 1,
-        serialNumber: record.serialNumber || '',
-        workOrder: record.workOrder || '',
-        station: record.station || '',
-        model: record.model || '',
-        result: record.result || 'FAIL',
-        testTime: record.testTime || new Date().toISOString(),
-        tester: record.tester || 'Unknown',
-        partNumber: record.partNumber || '',
-        items: record.items || [],
-      }));
-    }
-  } catch (error) {
-    console.error('從 localStorage 載入資料時發生錯誤:', error);
-  }
-
-  return [];
-};
-
-// 模擬測試數據（備用）
-const generateMockData = () => {
-  const stations: string[] = [];
-  const models: string[] = [];
-  const results = ['PASS', 'FAIL'];
-
-  const records = [];
-  for (let i = 0; i < 0; i++) {
-    const randomDate = new Date();
-    randomDate.setDate(randomDate.getDate() - Math.floor(Math.random() * 7));
-
-    records.push({
-      id: i + 1,
-      serialNumber: `CH${Math.random().toString().substr(2, 12)}`,
-      workOrder: `6210018423-000${String(Math.floor(Math.random() * 100)).padStart(2, '0')}`,
-      station: stations[Math.floor(Math.random() * stations.length)],
-      model: models[Math.floor(Math.random() * models.length)],
-      result: Math.random() > 0.2 ? 'PASS' : 'FAIL', // 80% pass rate
-      testTime: randomDate.toLocaleString(),
-      tester: `2001092${Math.floor(Math.random() * 10)}A`,
-    });
-  }
-  return records;
-};
+import { useDashboardData } from '../hooks/useDashboardData';
 
 interface CompleteMesDashboardProps {
   showAdvanced?: boolean;
@@ -129,25 +54,24 @@ interface CompleteMesDashboardProps {
 
 export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMesDashboardProps) {
   const { t } = useLanguage();
+  const { filters: globalFilters, setFilters: setGlobalFilters } = useFilters();
   const { setCurrentView } = useNavigation();
-  const [dashboardFilters, setDashboardFilters] = useState<SimpleFilterOptions>({});
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [testData, setTestData] = useState<any[]>([]);
   const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedRetestRecord, setSelectedRetestRecord] = useState<any>(null);
 
   // 拖拽縮放狀態管理
   const [cardSizes, setCardSizes] = useState<Record<string, { width: number; height: number }>>({
-    stationPerformance: { width: 50, height: 400 }, // 50% 寬度
+    stationPerformance: { width: 50, height: 400 },
     stationTestCount: { width: 50, height: 400 },
     stationStats: { width: 50, height: 400 },
+    stationPassRateTrend: { width: 50, height: 400 },
     failureAnalysis: { width: 50, height: 400 },
     retestStats: { width: 50, height: 400 },
     recentRecords: { width: 50, height: 400 },
     modelStats: { width: 50, height: 400 }
   });
-  const [dragState, setDragState] = useState<{ 
+  const [dragState, setDragState] = useState<{
     isDragging: boolean;
     cardId: string;
     startX: number;
@@ -156,472 +80,33 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
     startHeight: number;
   } | null>(null);
 
-  // 載入測試數據
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        const data = await loadRealTestData();
-        setTestData(data);
-        console.log(`📈 儀表板資料載入完成: ${data.length} 筆記錄`);
-      } catch (error) {
-        console.error('載入儀表板資料失敗:', error);
-        setTestData([]);
-      }
-    };
-
-    loadData();
-  }, [refreshKey]);
-
-  // 監聽資料更新
-  useEffect(() => {
-    const handleDataUpdate = async () => {
-      console.log('🔄 儀表板收到資料更新事件...');
-      try {
-        const data = await loadRealTestData();
-        setTestData(data);
-        console.log(`📈 儀表板資料已更新: ${data.length} 筆記錄`);
-      } catch (error) {
-        console.error('儀表板資料更新失敗:', error);
-      }
-    };
-
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'mesTestData') {
-        handleDataUpdate();
-      }
-    };
-
-    // 監聽事件
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('mesDataUpdated', handleDataUpdate);
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('mesDataUpdated', handleDataUpdate);
-    };
-  }, []);
-
-  // 從系統設定讀取站別配置
-  const configuredStations = useMemo(() => {
-    try {
-      const saved = localStorage.getItem('mesStations');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  }, []);
-
-  // 根據篩選條件過濾數據
-  const filteredData = useMemo(() => {
-    let filtered = [...testData];
-
-    // 日期篩選 - 使用具體的日期範圍
-    if (dashboardFilters.dateFrom && dashboardFilters.dateTo) {
-      const startDate = new Date(dashboardFilters.dateFrom);
-      const endDate = new Date(dashboardFilters.dateTo);
-      endDate.setHours(23, 59, 59, 999); // 包含結束日期當天
-
-      filtered = filtered.filter(record => {
-        const recordDate = new Date(record.testTime);
-        return recordDate >= startDate && recordDate <= endDate;
-      });
-    }
-
-    // 結果篩選
-    if (dashboardFilters.result && dashboardFilters.result !== 'all') {
-      filtered = filtered.filter(record =>
-        record.result.toLowerCase() === dashboardFilters.result?.toLowerCase()
-      );
-    }
-
-    // 序號篩選
-    if (dashboardFilters.serialNumber && dashboardFilters.serialNumber.trim() !== '') {
-      filtered = filtered.filter(record =>
-        record.serialNumber.toLowerCase().includes(dashboardFilters.serialNumber!.toLowerCase())
-      );
-    }
-
-    // 工單篩選
-    if (dashboardFilters.workOrder && dashboardFilters.workOrder.trim() !== '') {
-      filtered = filtered.filter(record =>
-        record.workOrder.toLowerCase().includes(dashboardFilters.workOrder!.toLowerCase())
-      );
-    }
-
-    // 站別篩選 (空字串代表全部)
-    if (dashboardFilters.station && dashboardFilters.station.trim() !== '') {
-      filtered = filtered.filter(record => record.station === dashboardFilters.station);
-    }
-
-    // 機種篩選 (空字串代表全部)
-    if (dashboardFilters.model && dashboardFilters.model.trim() !== '') {
-      filtered = filtered.filter(record => record.model === dashboardFilters.model);
-    }
-
-    return filtered;
-  }, [testData, dashboardFilters]);
-
-  // 計算複測記錄（相同序號的多次測試，且結果為 FAIL）
-  const retestRecords = useMemo(() => {
-    // 只篩選 FAIL 的記錄
-    const failedRecords = filteredData.filter(record => record.result === 'FAIL');
-
-    // 按序號分組
-    const serialNumberGroups = new Map<string, any[]>();
-
-    failedRecords.forEach(record => {
-      const serial = record.serialNumber;
-      if (!serialNumberGroups.has(serial)) {
-        serialNumberGroups.set(serial, []);
-      }
-      serialNumberGroups.get(serial)!.push(record);
-    });
-
-    // 處理每個序號群組
-    const retestData: any[] = [];
-    serialNumberGroups.forEach((records, serialNumber) => {
-      // 按時間排序記錄
-      const sortedRecords = records.sort((a, b) =>
-        new Date(a.testTime).getTime() - new Date(b.testTime).getTime()
-      );
-
-      const firstRecord = sortedRecords[0]; // 最早的記錄
-      const lastRecord = sortedRecords[sortedRecords.length - 1]; // 最晚的記錄
-
-      // 收集所有 FAIL 測項
-      const allFailedItems: string[] = [];
-
-      sortedRecords.forEach(record => {
-        if (record.items && Array.isArray(record.items)) {
-          const failedItems = record.items.filter((item: any) => item.result === 'FAIL');
-          failedItems.forEach((item: any) => {
-            if (item.name) {
-              allFailedItems.push(item.name);
-            }
-          });
-        }
-      });
-
-      // 去重並排序
-      const uniqueFailedItems = [...new Set(allFailedItems)].sort();
-
-      // 生成失敗原因顯示
-      const failureReason = uniqueFailedItems.length > 0
-        ? uniqueFailedItems.join(', ')
-        : '測試失敗';
-
-      retestData.push({
-        ...lastRecord,
-        retestCount: records.length,
-        firstTestTime: firstRecord.testTime,
-        lastTestTime: lastRecord.testTime,
-        failureReason: failureReason,
-        allRecords: sortedRecords, // 保存所有記錄
-        failedItems: uniqueFailedItems
-      });
-    });
-
-    // 按複測次數排序（次數多的在前）
-    return retestData.sort((a, b) => b.retestCount - a.retestCount);
-  }, [filteredData]);
-
-  // 計算站別統計資料 (用於詳細統計表格)
-  const detailedStationStats = useMemo(() => {
-    const stats: Record<string, { total: number; failed: number; passed: number }> = {};
-
-    // 初始化所有配置的站別
-    configuredStations.forEach(station => {
-      stats[station] = { total: 0, failed: 0, passed: 0 };
-    });
-
-    // 統計實際資料
-    filteredData.forEach(record => {
-      const station = record.station || 'Unknown';
-      if (!stats[station]) {
-        stats[station] = { total: 0, failed: 0, passed: 0 };
-      }
-      stats[station].total++;
-      if (record.result === 'PASS') {
-        stats[station].passed++;
-      } else {
-        stats[station].failed++;
-      }
-    });
-
-    return stats;
-  }, [configuredStations, filteredData]);
-
-  // 計算機種統計資料
-  const modelStats = useMemo(() => {
-    try {
-      const saved = localStorage.getItem('mesModels');
-      const configuredModels = saved ? JSON.parse(saved) : [];
-      const stats: Record<string, { total: number; passed: number; passRate: number }> = {};
-
-      // 初始化所有配置的機種
-      configuredModels.forEach((model: string) => {
-        stats[model] = { total: 0, passed: 0, passRate: 0 };
-      });
-
-      // 統計實際資料
-      filteredData.forEach(record => {
-        const model = record.model || 'Unknown';
-        if (!stats[model]) {
-          stats[model] = { total: 0, passed: 0, passRate: 0 };
-        }
-        stats[model].total++;
-        if (record.result === 'PASS') {
-          stats[model].passed++;
-        }
-      });
-
-      // 計算通過率
-      Object.keys(stats).forEach(model => {
-        const data = stats[model];
-        data.passRate = data.total > 0 ? Number(((data.passed / data.total) * 100).toFixed(1)) : 0;
-      });
-
-      return stats;
-    } catch {
-      return {};
-    }
-  }, [filteredData]);
-
-  // 計算失敗原因分析
-  const failureReasons = useMemo(() => {
-    const testItemStats = new Map<string, { total: number, failed: number }>();
-
-    // 統計每個測項的總數和失敗數
-    filteredData.forEach(record => {
-      if (record.items && Array.isArray(record.items)) {
-        record.items.forEach((item: any) => {
-          const testName = item.name || 'Unknown Test';
-          const current = testItemStats.get(testName) || { total: 0, failed: 0 };
-          current.total++;
-          if (item.result === 'FAIL') {
-            current.failed++;
-          }
-          testItemStats.set(testName, current);
-        });
-      }
-    });
-
-    // 轉換為陣列並計算失敗比例，只顯示有失敗的測項
-    return Array.from(testItemStats.entries())
-      .map(([testName, stats]) => ({
-        reason: testName,
-        count: stats.failed,
-        total: stats.total,
-        failureRate: stats.total > 0 ? Number(((stats.failed / stats.total) * 100).toFixed(1)) : 0
-      }))
-      .filter(item => item.count > 0) // 只顯示有失敗的測項
-      .sort((a, b) => b.failureRate - a.failureRate) // 按失敗率排序
-      .slice(0, 10); // 限制顯示數量
-  }, [filteredData]);
-
-  // 計算復測統計數據
-  const retestStats = useMemo(() => {
-    const retestData = new Map<string, { originalCount: number, retestCount: number, finalPassCount: number }>();
-
-    // 根據序號分組，找出同一序號的多次測試記錄
-    const serialGroups = new Map<string, any[]>();
-    filteredData.forEach(record => {
-      const serial = record.serialNumber;
-      if (!serialGroups.has(serial)) {
-        serialGroups.set(serial, []);
-      }
-      serialGroups.get(serial)!.push(record);
-    });
-
-    // 分析每個序號的測試情況
-    serialGroups.forEach((records, serial) => {
-      if (records.length > 1) {
-        // 按時間排序
-        records.sort((a, b) => new Date(a.testTime).getTime() - new Date(b.testTime).getTime());
-
-        const firstTest = records[0];
-        const station = firstTest.station || 'Unknown';
-
-        if (!retestData.has(station)) {
-          retestData.set(station, { originalCount: 0, retestCount: 0, finalPassCount: 0 });
-        }
-
-        const stationData = retestData.get(station)!;
-        stationData.originalCount++;
-
-        // 如果有多次測試，算作復測
-        if (records.length > 1) {
-          stationData.retestCount++;
-
-          // 檢查最終結果是否通過
-          const lastTest = records[records.length - 1];
-          if (lastTest.result === 'PASS') {
-            stationData.finalPassCount++;
-          }
-        }
-      } else {
-        // 單次測試
-        const record = records[0];
-        const station = record.station || 'Unknown';
-
-        if (!retestData.has(station)) {
-          retestData.set(station, { originalCount: 0, retestCount: 0, finalPassCount: 0 });
-        }
-
-        retestData.get(station)!.originalCount++;
-      }
-    });
-
-    // 轉換為陣列並計算統計值
-    return Array.from(retestData.entries())
-      .map(([station, data]) => ({
-        station,
-        originalCount: data.originalCount,
-        retestCount: data.retestCount,
-        retestRate: data.originalCount > 0 ? Number(((data.retestCount / data.originalCount) * 100).toFixed(1)) : 0,
-        finalPassCount: data.finalPassCount,
-        retestPassRate: data.retestCount > 0 ? Number(((data.finalPassCount / data.retestCount) * 100).toFixed(1)) : 0
-      }))
-      .filter(item => item.retestCount > 0) // 只顯示有復測的站別
-      .sort((a, b) => b.retestRate - a.retestRate); // 按復測率排序
-  }, [filteredData]);
-
-  // 計算統計數據
-  const stats = useMemo(() => {
-    const total = filteredData.length;
-    const passed = filteredData.filter(r => r.result === 'PASS').length;
-    const failed = total - passed;
-    const passRate = total > 0 ? ((passed / total) * 100) : 0;
-
-    // 模擬設備統計
-    const deviceCount = 50; // 模擬設備總數
-    const passedDeviceCount = Math.floor(deviceCount * (passRate / 100));
-    const productionYieldRate = total > 0 ? ((passedDeviceCount / deviceCount) * 100) : 0;
-
-    // 模擬複測統計
-    const retestCount = Math.floor(failed * 0.3); // 假設30%的失敗需要複測
-
-    // 計算趨勢
-    const previousRate = 85; // 假設的前期數據
-    const trend = passRate > previousRate ? 'up' : passRate < previousRate ? 'down' : 'neutral';
-    const trendValue = `${Math.abs(passRate - previousRate).toFixed(1)}%`;
-
-    return {
-      total,
-      passed,
-      failed,
-      passRate: parseFloat(passRate.toFixed(1)),
-      passRateText: `${passRate.toFixed(1)}`,
-      deviceCount,
-      passedDeviceCount,
-      productionYieldRate: parseFloat(productionYieldRate.toFixed(1)),
-      productionYieldRateText: `${productionYieldRate.toFixed(1)}`,
-      retestCount,
-      trend,
-      trendValue
-    };
-  }, [filteredData]);
-
-  // 計算日期範圍和間隔文字
-  const dateRangeInfo = useMemo(() => {
-    if (dashboardFilters.dateFrom && dashboardFilters.dateTo) {
-      const startDate = new Date(dashboardFilters.dateFrom);
-      const endDate = new Date(dashboardFilters.dateTo);
-
-      // 計算日期間隔
-      const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 包含結束日
-
-      // 格式化日期顯示
-      const formatDate = (date: Date) => {
-        return date.toLocaleDateString('zh-TW', {
-          month: '2-digit',
-          day: '2-digit'
-        });
-      };
-
-      const intervalText = diffDays === 1
-        ? `${formatDate(startDate)}`
-        : `${formatDate(startDate)} - ${formatDate(endDate)} (${diffDays}天)`;
-
-      return {
-        startDate,
-        endDate,
-        intervalText,
-        diffDays
-      };
-    }
-
-    // 預設為最近7天
-    const endDate = new Date();
-    const startDate = new Date();
-    startDate.setDate(endDate.getDate() - 6);
-
-    return {
-      startDate,
-      endDate,
-      intervalText: t('last.7.days'),
-      diffDays: 7
-    };
-  }, [dashboardFilters.dateFrom, dashboardFilters.dateTo, t]);
-
-  // 計算每日時間序列數據
-  const dailySeriesData = useMemo(() => {
-    const { startDate, endDate, diffDays } = dateRangeInfo;
-
-    // 初始化每日統計
-    const dailyStats = [];
-    for (let i = 0; i < diffDays; i++) {
-      const currentDate = new Date(startDate);
-      currentDate.setDate(startDate.getDate() + i);
-      const dateStr = currentDate.toISOString().slice(0, 10);
-
-      dailyStats.push({
-        date: dateStr,
-        total: 0,
-        passed: 0,
-        failed: 0,
-        devices: new Set()
-      });
-    }
-
-    // 統計實際資料
-    filteredData.forEach(record => {
-      const testDate = new Date(record.testTime).toISOString().slice(0, 10);
-      const dayIndex = dailyStats.findIndex(day => day.date === testDate);
-
-      if (dayIndex !== -1) {
-        dailyStats[dayIndex].total++;
-        if (record.result === 'PASS') {
-          dailyStats[dayIndex].passed++;
-        } else {
-          dailyStats[dayIndex].failed++;
-        }
-        // 統計不同設備
-        if (record.serialNumber) {
-          dailyStats[dayIndex].devices.add(record.serialNumber);
-        }
-      }
-    });
-
-    return {
-      totalTests: dailyStats.map(day => day.total),
-      passRates: dailyStats.map(day =>
-        day.total > 0 ? Math.round((day.passed / day.total) * 100) : 0
-      ),
-      deviceCounts: dailyStats.map(day => day.devices.size),
-      retestCounts: dailyStats.map(day => Math.floor(day.failed * 0.3)) // 模擬復測數據
-    };
-  }, [filteredData, dateRangeInfo]);
+  // 使用 Dashboard 資料 Hook - 一次性取得所有需要的資料
+  const {
+    filteredData,
+    retestRecords,
+    detailedStationStats,
+    modelStats,
+    failureReasons,
+    retestStats,
+    stats,
+    dailySeriesData,
+    dailyStationData,
+    dailyStationPassRates,
+    chartData,
+    dateRangeInfo,
+    configuredStations,
+    configuredModels,
+  } = useDashboardData(globalFilters as SimpleFilterOptions);
 
   // MES 統計卡片數據
   const data: StatCardProps[] = [
     {
-      title: "總測試數",
+      title: t('total.tests'),
       value: stats.total.toLocaleString(),
-      subtitle: `設備數量: ${stats.deviceCount}`,
+      subtitle: `${t('device.count')}: ${stats.deviceCount.toLocaleString()}`,
       interval: dateRangeInfo.intervalText,
-      trend: "up",
+      trend: stats.total > 0 ? "up" : "neutral",
+      trendValue: stats.total > 0 ? `${stats.total}` : "0",
       icon: <AssessmentIcon />,
       color: 'primary',
       data: dailySeriesData.totalTests,
@@ -631,12 +116,12 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
       },
     },
     {
-      title: "測試良率",
+      title: t('test.yield'),
       value: stats.passRateText,
-      subtitle: `通過: ${stats.passed} / 失敗: ${stats.failed}`,
+      subtitle: `${t('passed')}: ${stats.passed.toLocaleString()} / ${t('failed')}: ${stats.failed.toLocaleString()}`,
       interval: dateRangeInfo.intervalText,
       trend: stats.trend as "up" | "down" | "neutral",
-      trendValue: stats.trendValue,
+      trendValue: stats.passRateText,
       icon: <CheckCircleIcon />,
       color: 'success',
       data: dailySeriesData.passRates,
@@ -646,25 +131,27 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
       },
     },
     {
-      title: "生產良率",
+      title: t('production.yield'),
       value: stats.productionYieldRateText,
-      subtitle: `完成: ${stats.passedDeviceCount} / 總數: ${stats.deviceCount}`,
+      subtitle: `${t('passed.devices')}: ${stats.passedDeviceCount.toLocaleString()} / ${t('total.devices')}: ${stats.deviceCount.toLocaleString()}`,
       interval: dateRangeInfo.intervalText,
-      trend: "up",
+      trend: stats.productionYieldRate >= stats.passRate ? "up" : "down",
+      trendValue: stats.productionYieldRateText,
       icon: <MemoryIcon />,
       color: 'info',
-      data: dailySeriesData.deviceCounts,
+      data: dailySeriesData.productionYieldRates,
       dateRange: {
         startDate: dateRangeInfo.startDate,
         endDate: dateRangeInfo.endDate
       },
     },
     {
-      title: "復測數量",
+      title: t('retest.count.alt'),
       value: stats.retestCount.toLocaleString(),
       interval: dateRangeInfo.intervalText,
-      subtitle: `複測數量: ${stats.retestCount.toLocaleString()}`,
-      trend: "down",
+      subtitle: `${t('retest.count')}: ${stats.retestCount.toLocaleString()}`,
+      trend: stats.retestCount > 0 ? "down" : "neutral",
+      trendValue: stats.retestCount > 0 ? `${stats.retestCount}` : "0",
       icon: <ErrorIcon />,
       color: 'warning',
       data: dailySeriesData.retestCounts,
@@ -675,101 +162,8 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
     },
   ];
 
-  // 圖表數據
-  const chartData = useMemo(() => {
-    // 測試結果分佈 (圓餅圖)
-    const pieData = [
-      { id: 0, value: stats.passed, label: 'PASS', color: '#4caf50' },
-      { id: 1, value: stats.failed, label: 'FAIL', color: '#f44336' },
-    ];
-
-    // 站別測試數量 (長條圖) - 使用系統設定的站別，確保一致性
-    const stationStats = new Map();
-
-    // 初始化所有配置的站別，確保它們都出現在圖表中
-    configuredStations.forEach(station => {
-      stationStats.set(station, { pass: 0, fail: 0 });
-    });
-
-    // 統計實際資料
-    filteredData.forEach(record => {
-      const station = record.station || 'Unknown';
-      const current = stationStats.get(station) || { pass: 0, fail: 0 };
-      if (record.result === 'PASS') {
-        current.pass++;
-      } else {
-        current.fail++;
-      }
-      stationStats.set(station, current);
-    });
-
-    const barData = Array.from(stationStats.entries()).map(([station, data]) => ({
-      station,
-      tests: data.pass + data.fail,
-      pass: data.pass,
-      fail: data.fail
-    })).sort((a, b) => {
-      // 優先顯示配置的站別，然後是其他站別
-      const aIsConfigured = configuredStations.includes(a.station);
-      const bIsConfigured = configuredStations.includes(b.station);
-      if (aIsConfigured && !bIsConfigured) return -1;
-      if (!aIsConfigured && bIsConfigured) return 1;
-      return a.station.localeCompare(b.station);
-    });
-
-    // 測試趨勢 (折線圖) - 按天統計選定時間範圍
-    const dateRange = [];
-    const dailyStats = new Map();
-
-    // 初始化選定時間範圍內的所有日期
-    for (let i = 0; i < dateRangeInfo.diffDays; i++) {
-      const date = new Date(dateRangeInfo.startDate);
-      date.setDate(dateRangeInfo.startDate.getDate() + i);
-      const dateStr = date.toISOString().slice(0, 10);
-      dateRange.push(dateStr);
-      dailyStats.set(dateStr, { total: 0, pass: 0, fail: 0 });
-    }
-
-    // 統計實際資料
-    filteredData.forEach(record => {
-      const testDate = new Date(record.testTime).toISOString().slice(0, 10);
-      if (dailyStats.has(testDate)) {
-        const current = dailyStats.get(testDate);
-        current.total++;
-        if (record.result === 'PASS') {
-          current.pass++;
-        } else {
-          current.fail++;
-        }
-      }
-    });
-
-    const lineData = dateRange.map(date => {
-      const stats = dailyStats.get(date);
-      return {
-        date: new Date(date).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' }),
-        total: stats.total,
-        pass: stats.pass,
-        fail: stats.fail,
-        passRate: stats.total > 0 ? (stats.pass / stats.total * 100) : 0
-      };
-    });
-
-    return {
-      pie: pieData,
-      bar: barData,
-      line: {
-        months: lineData.map(d => d.date),
-        actual: lineData.map(d => d.total),
-        targets: lineData.map(d => d.passRate),
-        projected: lineData.map(d => d.pass)
-      }
-    };
-  }, [filteredData, stats, dateRangeInfo]);
-
-
   const handleDashboardFilterChange = (filters: SimpleFilterOptions) => {
-    setDashboardFilters(filters);
+    setGlobalFilters(filters);
   };
 
 
@@ -892,48 +286,28 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             onClick={() => setCurrentView('dashboard')}
           >
             <HomeIcon sx={{ mr: 0.5 }} fontSize="inherit" />
-            首頁
+            {t('home')}
           </Link>
           <Typography color="text.primary" sx={{ display: 'flex', alignItems: 'center' }}>
-            儀表板
+            {t('dashboard')}
           </Typography>
         </Breadcrumbs>
 
         <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600, mb: 0 }}>
-          MES 數據監控儀表板
+          {t('mes.dashboard.title')}
         </Typography>
       </Box>
 
 
-      {/* 快速篩選卡片 */}
-      <Card sx={{ mb: 3, border: 1, borderColor: 'divider', boxShadow: 1 }}>
-        <CardContent>
-          <SimpleQuickFilters onFilterChange={handleDashboardFilterChange} />
-        </CardContent>
-      </Card>
-
-      {/* 工具列：匯出 / 重新整理 / 檢視全部 */}
-      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Button
-            variant="contained"
-            startIcon={<FileDownloadIcon />}
-            onClick={openExportMenu}
-          >
-            匯出
-          </Button>
-          <Menu
-            anchorEl={exportAnchorEl}
-            open={Boolean(exportAnchorEl)}
-            onClose={closeExportMenu}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-          >
-            <MenuItem onClick={() => handleExportFormat('csv')}>CSV 匯出</MenuItem>
-            <MenuItem onClick={() => handleExportFormat('json')}>JSON 匯出</MenuItem>
-          </Menu>
-        </Stack>
+      {/* 快速篩選 */}
+      <Box sx={{ mb: 3 }}>
+        <SimpleQuickFilters
+          onFilterChange={handleDashboardFilterChange}
+          stations={configuredStations}
+          models={configuredModels}
+        />
       </Box>
+
 
       {/* KPI 統計區域 */}
       <Box sx={{ mb: 3 }}>
@@ -962,7 +336,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  各站點測試表現統計
+                  {t('station.performance.stats')}
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <VisibilityIcon fontSize="small" />
@@ -1030,65 +404,70 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  站別測試數量
+                  {t('station.test.count')}
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <VisibilityIcon fontSize="small" />
                 </IconButton>
               </Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Daily station test count by test type
-              </Typography>
+
+              {/* 站別顏色圖例 */}
+              <Box sx={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: 1.5,
+                mb: 2,
+                pb: 1,
+                borderBottom: 1,
+                borderColor: 'divider'
+              }}>
+                {Object.entries(dailyStationData).map(([station, _], index) => {
+                  const colors = ['#6366f1', '#ec4899', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4', '#ef4444', '#84cc16'];
+                  const color = colors[index % colors.length];
+                  return (
+                    <Box key={station} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Box sx={{
+                        width: 12,
+                        height: 12,
+                        backgroundColor: color,
+                        borderRadius: 0.5
+                      }} />
+                      <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
+                        {station}
+                      </Typography>
+                    </Box>
+                  );
+                })}
+              </Box>
+
               <Box sx={{ flex: 1, minHeight: 0 }}>
                 <BarChart
                   xAxis={[{
                     scaleType: 'band',
-                    data: dailySeriesData.totalTests.map((_, index) => {
+                    data: Array.from({ length: dateRangeInfo.diffDays }, (_, i) => {
                       const date = new Date(dateRangeInfo.startDate);
-                      date.setDate(date.getDate() + index);
-                      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                      date.setDate(date.getDate() + i);
+                      return date.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' });
                     })
                   }]}
                   yAxis={[{
-                    label: '',
-                    max: Math.max(...dailySeriesData.totalTests) * 1.2
+                    label: t('test.count'),
                   }]}
-                  series={[ 
-                    {
-                      data: dailySeriesData.totalTests.map(total => Math.floor(total * 0.4)),
-                      label: 'ST1.large',
-                      color: '#6366f1',
+                  series={Object.entries(dailyStationData).map(([station, data], index) => {
+                    const colors = ['#6366f1', '#ec4899', '#10b981', '#8b5cf6', '#f59e0b', '#06b6d4', '#ef4444', '#84cc16'];
+                    return {
+                      data: data,
+                      label: station,
+                      color: colors[index % colors.length],
                       stack: 'total'
-                    },
-                    {
-                      data: dailySeriesData.totalTests.map(total => Math.floor(total * 0.25)),
-                      label: 'ST1.xlarge',
-                      color: '#ec4899',
-                      stack: 'total'
-                    },
-                    {
-                      data: dailySeriesData.totalTests.map(total => Math.floor(total * 0.25)),
-                      label: 'ST1.medium',
-                      color: '#10b981',
-                      stack: 'total'
-                    },
-                    {
-                      data: dailySeriesData.totalTests.map(total => Math.floor(total * 0.1)),
-                      label: 'ST1.small',
-                      color: '#8b5cf6',
-                      stack: 'total'
-                    },
-                  ]}
+                    };
+                  })}
                   height={300}
                   margin={{ left: 50, right: 20, top: 20, bottom: 60 }}
                   slotProps={{
                     legend: {
                       direction: 'row',
                       position: { vertical: 'bottom', horizontal: 'left' },
-                      itemMarkWidth: 12,
-                      itemMarkHeight: 12,
-                      markGap: 6,
-                      itemGap: 16,
                       padding: 0,
                     },
                   }}
@@ -1129,7 +508,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  站別表現統計
+                  {t('station.performance.table')}
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <VisibilityIcon fontSize="small" />
@@ -1140,24 +519,24 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell>站別</TableCell>
-                        <TableCell align="center">總數</TableCell>
-                        <TableCell align="center">通過率</TableCell>
-                        <TableCell align="center">狀態</TableCell>
+                        <TableCell>{t('column.station')}</TableCell>
+                        <TableCell align="center">{t('total')}</TableCell>
+                        <TableCell align="center">{t('pass.rate')}</TableCell>
+                        <TableCell align="center">{t('status')}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {Object.entries(detailedStationStats).map(([station, stationData]) => {
+                      {detailedStationStats.map((stationData) => {
                         const passRate = stationData.total > 0 ?
                           ((stationData.total - stationData.failed) / stationData.total * 100) : 0;
                         const status = passRate >= 95 ? 'excellent' : passRate >= 85 ? 'good' : passRate >= 70 ? 'warning' : 'critical';
-                        const statusText = status === 'excellent' ? '優秀' : status === 'good' ? '良好' : status === 'warning' ? '警告' : '異常';
+                        const statusText = status === 'excellent' ? t('excellent') : status === 'good' ? t('good') : status === 'warning' ? t('warning') : t('critical');
                         const statusColor = status === 'excellent' ? 'success' : status === 'good' ? 'info' : status === 'warning' ? 'warning' : 'error';
 
                         return (
-                          <TableRow key={station} hover>
+                          <TableRow key={stationData.station} hover>
                             <TableCell sx={{ fontFamily: 'monospace' }}>
-                              {station}
+                              {stationData.station}
                             </TableCell>
                             <TableCell align="center">
                               {stationData.total}
@@ -1210,7 +589,8 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             />
           </Card>
         </Grid>
-                {/* 機種測試統計 */}
+
+        {/* 機種測試統計 */}
                 <Grid size={{ xs: 12, md: cardSizes.modelStats.width / 100 * 12 }}>
           <Card sx={{
             border: 1,
@@ -1224,7 +604,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  機種測試統計
+                  {t('model.test.stats')}
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <MemoryIcon fontSize="small" />
@@ -1235,10 +615,10 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                   <Table size="small" stickyHeader>
                     <TableHead>
                       <TableRow>
-                        <TableCell>機種</TableCell>
-                        <TableCell align="center">測試數量</TableCell>
-                        <TableCell align="center">通過數量</TableCell>
-                        <TableCell align="center">通過率</TableCell>
+                        <TableCell>{t('column.model')}</TableCell>
+                        <TableCell align="center">{t('test.count')}</TableCell>
+                        <TableCell align="center">{t('passed.count')}</TableCell>
+                        <TableCell align="center">{t('pass.rate')}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1293,6 +673,131 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             />
           </Card>
         </Grid>
+
+        {/* 每日站別良率熱力圖 */}
+        <Grid size={{ xs: 12 }}>
+          <Card sx={{
+            border: 1,
+            borderColor: 'divider',
+            boxShadow: 1,
+            position: 'relative',
+          }}>
+            <CardContent>
+              <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                  {t('daily.station.pass.rate.heatmap')}
+                </Typography>
+                <IconButton size="small" sx={{ opacity: 0.5 }}>
+                  <TrendingUpIcon fontSize="small" />
+                </IconButton>
+              </Box>
+
+              {/* 圖例說明 */}
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                mb: 2,
+                pb: 2,
+                borderBottom: 1,
+                borderColor: 'divider'
+              }}>
+                <Typography variant="body2" color="text.secondary">
+                  {t('pass.rate')}:
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 20, height: 20, bgcolor: '#ef4444', borderRadius: 0.5 }} />
+                  <Typography variant="caption">0-60%</Typography>
+                  <Box sx={{ width: 20, height: 20, bgcolor: '#f59e0b', borderRadius: 0.5 }} />
+                  <Typography variant="caption">61-80%</Typography>
+                  <Box sx={{ width: 20, height: 20, bgcolor: '#84cc16', borderRadius: 0.5 }} />
+                  <Typography variant="caption">81-90%</Typography>
+                  <Box sx={{ width: 20, height: 20, bgcolor: '#10b981', borderRadius: 0.5 }} />
+                  <Typography variant="caption">91-100%</Typography>
+                  <Box sx={{ width: 20, height: 20, bgcolor: '#e5e7eb', border: '1px solid #d1d5db', borderRadius: 0.5 }} />
+                  <Typography variant="caption">{t('no.data')}</Typography>
+                </Box>
+              </Box>
+
+              {/* 熱力圖表格 */}
+              <Box sx={{ overflowX: 'auto' }}>
+                <Table size="small" sx={{ minWidth: 600 }}>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 600, minWidth: 80, p: 0.5, fontSize: '0.75rem' }}>{t('column.station')}</TableCell>
+                      {Array.from({ length: dateRangeInfo.diffDays }, (_, i) => {
+                        const date = new Date(dateRangeInfo.startDate);
+                        date.setDate(date.getDate() + i);
+                        return (
+                          <TableCell key={i} align="center" sx={{ minWidth: 40, p: 0.25, fontSize: '0.65rem' }}>
+                            {date.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' }).replace('/', '/')}
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {Object.entries(dailyStationPassRates).map(([station, rates]) => (
+                      <TableRow key={station}>
+                        <TableCell sx={{ fontWeight: 500, p: 0.5 }}>
+                          <Chip label={station} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
+                        </TableCell>
+                        {rates.map((rate, index) => {
+                          let bgcolor = '#e5e7eb'; // 無數據（灰色）
+                          let textColor = '#6b7280';
+
+                          if (rate !== null) {
+                            if (rate >= 91) {
+                              bgcolor = '#10b981'; // 深綠
+                              textColor = 'white';
+                            } else if (rate >= 81) {
+                              bgcolor = '#84cc16'; // 淺綠
+                              textColor = 'white';
+                            } else if (rate >= 61) {
+                              bgcolor = '#f59e0b'; // 橙色
+                              textColor = 'white';
+                            } else {
+                              bgcolor = '#ef4444'; // 紅色
+                              textColor = 'white';
+                            }
+                          }
+
+                          return (
+                            <TableCell
+                              key={index}
+                              align="center"
+                              sx={{
+                                p: '2px',
+                                bgcolor,
+                                color: textColor,
+                                fontWeight: 600,
+                                fontSize: '0.65rem',
+                                border: '1px solid #fff',
+                                minWidth: 40,
+                                maxWidth: 40,
+                                cursor: rate !== null ? 'pointer' : 'default',
+                                '&:hover': rate !== null ? {
+                                  opacity: 0.8,
+                                  transform: 'scale(1.1)',
+                                  transition: 'all 0.2s',
+                                  zIndex: 1,
+                                  position: 'relative'
+                                } : {}
+                              }}
+                              title={rate !== null ? `${station} - ${rate}%` : t('no.data')}
+                            >
+                              {rate !== null ? `${rate}%` : '-'}
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
       </Grid>
 
       {/* 第二行統計卡片區域 */}
@@ -1311,7 +816,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  失敗原因分析
+                  {t('failure.reason.analysis')}
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <ErrorIcon fontSize="small" />
@@ -1323,11 +828,11 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow>
-                          <TableCell>測項名稱</TableCell>
-                          <TableCell align="center">失敗次數</TableCell>
-                          <TableCell align="center">總測試次數</TableCell>
-                          <TableCell align="center">失敗率</TableCell>
-                          <TableCell>分佈</TableCell>
+                          <TableCell>{t('test.item.name')}</TableCell>
+                          <TableCell align="center">{t('failure.count')}</TableCell>
+                          <TableCell align="center">{t('total.test.count')}</TableCell>
+                          <TableCell align="center">{t('failure.rate')}</TableCell>
+                          <TableCell>{t('distribution')}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1379,7 +884,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                 ) : (
                   <Box display="flex" alignItems="center" justifyContent="center" height="100%">
                     <Typography variant="body2" color="text.secondary">
-                      目前沒有失敗測項資料
+                      {t('no.failure.data')}
                     </Typography>
                   </Box>
                 )}
@@ -1418,7 +923,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
             <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                  復測統計分析
+                  {t('retest.statistics')}
                 </Typography>
                 <IconButton size="small" sx={{ opacity: 0.5 }}>
                   <TrendingUpIcon fontSize="small" />
@@ -1430,12 +935,12 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                     <Table size="small" stickyHeader>
                       <TableHead>
                         <TableRow>
-                          <TableCell>站別</TableCell>
-                          <TableCell align="center">原始測試</TableCell>
-                          <TableCell align="center">復測次數</TableCell>
-                          <TableCell align="center">復測率</TableCell>
-                          <TableCell align="center">復測通過</TableCell>
-                          <TableCell align="center">復測通過率</TableCell>
+                          <TableCell>{t('column.station')}</TableCell>
+                          <TableCell align="center">{t('original.test')}</TableCell>
+                          <TableCell align="center">{t('retest.count')}</TableCell>
+                          <TableCell align="center">{t('retest.rate')}</TableCell>
+                          <TableCell align="center">{t('retest.passed')}</TableCell>
+                          <TableCell align="center">{t('retest.pass.rate')}</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
@@ -1538,7 +1043,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                 </Typography>
                 <Box display="flex" alignItems="center" gap={2}>
                   <Typography variant="body2" color="text.secondary">
-                    顯示 {Math.min(10, filteredData.length)} / {filteredData.length} 筆記錄
+                    {t('show.records')} {Math.min(10, filteredData.length)} / {filteredData.length} {t('records')}
                   </Typography>
                   <Button
                     variant="text"
@@ -1556,7 +1061,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                       }
                     }}
                   >
-                    View All
+                    {t('view.all')}
                   </Button>
                 </Box>
               </Box>
@@ -1565,12 +1070,12 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell>序號</TableCell>
-                        <TableCell>站別</TableCell>
-                        <TableCell>機種</TableCell>
-                        <TableCell>結果</TableCell>
-                        <TableCell>時間</TableCell>
-                        <TableCell>測試員</TableCell>
+                        <TableCell>{t('column.serial.number')}</TableCell>
+                        <TableCell>{t('column.station')}</TableCell>
+                        <TableCell>{t('column.model')}</TableCell>
+                        <TableCell>{t('column.result')}</TableCell>
+                        <TableCell>{t('column.test.time')}</TableCell>
+                        <TableCell>{t('column.tester')}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1647,6 +1152,22 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
                   <Typography variant="body2" color="text.secondary">
                     {t('show.records')} {Math.min(10, retestRecords.length)} / {retestRecords.length} {t('records')}
                   </Typography>
+                  <Button
+                    variant="text"
+                    size="small"
+                    endIcon={<NavigateNextIcon />}
+                    onClick={() => setCurrentView('retest')}
+                    sx={{
+                      color: 'primary.main',
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      '&:hover': {
+                        backgroundColor: 'action.hover'
+                      }
+                    }}
+                  >
+                    {t('view.all')}
+                  </Button>
                 </Box>
               </Box>
               <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto' }}>

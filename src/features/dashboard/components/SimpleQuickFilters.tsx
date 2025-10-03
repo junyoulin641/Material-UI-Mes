@@ -1,10 +1,8 @@
 import * as React from 'react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
-import Card from '@mui/material/Card';
-import CardContent from '@mui/material/CardContent';
 import Stack from '@mui/material/Stack';
 import Grid from '@mui/material/Grid';
 import TextField from '@mui/material/TextField';
@@ -22,6 +20,7 @@ import Divider from '@mui/material/Divider';
 import CloseIcon from '@mui/icons-material/Close';
 import SearchIcon from '@mui/icons-material/Search';
 import { useLanguage } from '../../../contexts/LanguageContext';
+import { useFilters } from '../../../contexts/FilterContext';
 
 export interface SimpleFilterOptions {
   dateRange?: 'all' | 'today' | 'yesterday' | 'this-week' | 'last-week' | 'this-month' | 'last-month' | 'custom';
@@ -51,23 +50,9 @@ export default function SimpleQuickFilters({
   models = []
 }: SimpleQuickFiltersProps) {
   const { t } = useLanguage();
+  const { filters: globalFilters, setFilters: setGlobalFilters } = useFilters();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [tempFilters, setTempFilters] = useState<SimpleFilterOptions>({});
-  const [filters, setFilters] = useState<SimpleFilterOptions>({
-    dateRange: 'all',
-    result: 'all',
-    serialNumber: '',
-    workOrder: '',
-    station: '',
-    model: '',
-    dateFrom: '',
-    dateTo: '',
-    startTime: '00:00',
-    endTime: '23:59',
-    advancedSearch: false,
-    tester: '',
-    batchNumber: ''
-  });
 
   // 簡化的日期篩選選項
   const dateOptions = [
@@ -89,8 +74,8 @@ export default function SimpleQuickFilters({
   ];
 
   const handleFilterChange = (key: keyof SimpleFilterOptions, value: string) => {
-    const newFilters = { ...filters, [key]: value };
-    setFilters(newFilters);
+    const newFilters = { ...globalFilters, [key]: value };
+    setGlobalFilters(newFilters);
     onFilterChange(newFilters);
   };
 
@@ -101,18 +86,18 @@ export default function SimpleQuickFilters({
     start.setDate(end.getDate() - days);
 
     const newFilters = {
-      ...filters,
+      ...globalFilters,
       dateFrom: start.toISOString().slice(0, 10),
       dateTo: end.toISOString().slice(0, 10),
       dateRange: 'custom'
     };
-    setFilters(newFilters);
+    setGlobalFilters(newFilters);
     onFilterChange(newFilters);
   };
 
   // 進階搜尋對話框處理
   const handleOpenAdvanced = () => {
-    setTempFilters({ ...filters });
+    setTempFilters({ ...globalFilters });
     setShowAdvanced(true);
   };
 
@@ -122,10 +107,15 @@ export default function SimpleQuickFilters({
   };
 
   const handleApplyAdvanced = () => {
-    setFilters(tempFilters);
+    setGlobalFilters(tempFilters);
     onFilterChange(tempFilters);
     setShowAdvanced(false);
   };
+
+  // 初始載入時觸發篩選
+  useEffect(() => {
+    onFilterChange(globalFilters);
+  }, []); // 只在掛載時執行一次
 
   const handleResetAdvanced = () => {
     const resetFilters = {
@@ -155,17 +145,73 @@ export default function SimpleQuickFilters({
   ];
 
   return (
-    <Card variant="outlined" sx={{ mb: 3 }}>
-      <CardContent sx={{ py: 2 }}>
-        {/* 篩選標題 */}
-        <Box mb={2}>
-          <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <SearchIcon color="primary" />
-            {t('quick.filters')}  
-          </Typography>
+    <Box
+      sx={{
+        background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(250,250,252,0.95) 100%)',
+        backdropFilter: 'blur(10px)',
+        borderRadius: 3,
+        border: '1px solid',
+        borderColor: 'divider',
+        boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
+        p: 3,
+        mb: 3,
+        position: 'relative',
+        overflow: 'hidden',
+        '&::before': {
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '3px',
+          background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 50%, #1976d2 100%)',
+          backgroundSize: '200% 100%',
+          animation: 'gradient 3s ease infinite',
+        },
+        '@keyframes gradient': {
+          '0%, 100%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+        },
+      }}
+    >
+      {/* 篩選標題 */}
+      <Box mb={3} display="flex" alignItems="center" justifyContent="space-between">
+        <Box display="flex" alignItems="center" gap={1.5}>
+          <Box
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: 2,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+              boxShadow: '0 4px 12px rgba(25,118,210,0.3)',
+            }}
+          >
+            <SearchIcon sx={{ color: 'white', fontSize: 22 }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+              {t('quick.filters')}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {t('filter.description') || '快速篩選測試資料'}
+            </Typography>
+          </Box>
         </Box>
+      </Box>
 
-        {/* 主要篩選控制 - 模仿原始MES設計 */}
+      {/* 主要篩選控制 */}
+      <Box
+        sx={{
+          background: 'rgba(255,255,255,0.6)',
+          borderRadius: 2,
+          p: 2.5,
+          border: '1px solid',
+          borderColor: 'grey.200',
+        }}
+      >
         <Grid container spacing={2} alignItems="center">
           {/* 序號關鍵字 */}
           <Grid size={{ xs: 12, sm: 6, md: 2 }}>
@@ -174,7 +220,7 @@ export default function SimpleQuickFilters({
               size="small"
               label={t('serial.number.search')}
               placeholder={t('enter.serial.number')}
-              value={filters.serialNumber || ''}
+              value={globalFilters.serialNumber || ''}
               onChange={(e) => handleFilterChange('serialNumber', e.target.value)}
             />
           </Grid>
@@ -184,7 +230,7 @@ export default function SimpleQuickFilters({
             <FormControl fullWidth size="small">
               <InputLabel>{t('station')}</InputLabel>
               <Select
-                value={filters.station || ''}
+                value={globalFilters.station || ''}
                 label={t('station')}
                 onChange={(e) => handleFilterChange('station', e.target.value)}
               >
@@ -203,7 +249,7 @@ export default function SimpleQuickFilters({
             <FormControl fullWidth size="small">
               <InputLabel>{t('model')}</InputLabel>
               <Select
-                value={filters.model || ''}
+                value={globalFilters.model || ''}
                 label={t('model')}
                 onChange={(e) => handleFilterChange('model', e.target.value)}
               >
@@ -225,7 +271,7 @@ export default function SimpleQuickFilters({
               type="date"
               label={t('date.from')}
               InputLabelProps={{ shrink: true }}
-              value={filters.dateFrom || ''}
+              value={globalFilters.dateFrom || ''}
               onChange={(e) => handleFilterChange('dateFrom', e.target.value)}
             />
           </Grid>
@@ -238,7 +284,7 @@ export default function SimpleQuickFilters({
               type="date"
               label={t('date.to')}
               InputLabelProps={{ shrink: true }}
-              value={filters.dateTo || ''}
+              value={globalFilters.dateTo || ''}
               onChange={(e) => handleFilterChange('dateTo', e.target.value)}
             />
           </Grid>
@@ -247,28 +293,58 @@ export default function SimpleQuickFilters({
           <Grid size={{ xs: 12, sm: 6, md: 2 }}>
             <Button
               fullWidth
-              variant="outlined"
+              variant="contained"
               startIcon={<SearchIcon />}
               onClick={handleOpenAdvanced}
+              sx={{
+                background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                boxShadow: '0 4px 12px rgba(25,118,210,0.25)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
+                  boxShadow: '0 6px 16px rgba(25,118,210,0.35)',
+                  transform: 'translateY(-1px)',
+                },
+                transition: 'all 0.2s ease',
+              }}
             >
               {t('advanced.search')}
             </Button>
           </Grid>
         </Grid>
+      </Box>
 
-        {/* 快速日期選擇 */}
-        <Box mt={2} display="flex" gap={1} flexWrap="wrap">
+      {/* 快速日期選擇 - 新設計 */}
+      <Box mt={3}>
+        <Typography variant="body2" color="text.secondary" mb={1.5} sx={{ fontWeight: 500 }}>
+          {t('quick.date.range') || '快速日期範圍'}
+        </Typography>
+        <Box display="flex" gap={1.5} flexWrap="wrap">
           {dateRangeQuickOptions.map((option) => (
             <Chip
               key={option.label}
               label={option.label}
               onClick={() => handleDateRangeSelect(option.days)}
               variant="outlined"
-              size="small"
-              sx={{ cursor: 'pointer' }}
+              size="medium"
+              sx={{
+                cursor: 'pointer',
+                borderColor: 'primary.main',
+                color: 'primary.main',
+                fontWeight: 500,
+                px: 1,
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
+                  color: 'white',
+                  borderColor: 'transparent',
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 4px 12px rgba(25,118,210,0.3)',
+                },
+              }}
             />
           ))}
         </Box>
+      </Box>
 
         {/* 進階搜尋對話框 */}
         <Dialog
@@ -476,7 +552,6 @@ export default function SimpleQuickFilters({
             </Button>
           </DialogActions>
         </Dialog>
-      </CardContent>
-    </Card>
+    </Box>
   );
 }
