@@ -149,11 +149,11 @@ export default function SimpleQuickFilters({
       sx={{
         background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(250,250,252,0.95) 100%)',
         backdropFilter: 'blur(10px)',
-        borderRadius: 3,
+        borderRadius: 2,
         border: '1px solid',
         borderColor: 'divider',
         boxShadow: '0 4px 20px rgba(0,0,0,0.04)',
-        p: 3,
+        p: 2,
         mb: 3,
         position: 'relative',
         overflow: 'hidden',
@@ -163,7 +163,7 @@ export default function SimpleQuickFilters({
           top: 0,
           left: 0,
           right: 0,
-          height: '3px',
+          height: '2px',
           background: 'linear-gradient(90deg, #1976d2 0%, #42a5f5 50%, #1976d2 100%)',
           backgroundSize: '200% 100%',
           animation: 'gradient 3s ease infinite',
@@ -175,28 +175,28 @@ export default function SimpleQuickFilters({
       }}
     >
       {/* 篩選標題 */}
-      <Box mb={3} display="flex" alignItems="center" justifyContent="space-between">
-        <Box display="flex" alignItems="center" gap={1.5}>
+      <Box mb={2} display="flex" alignItems="center" justifyContent="space-between">
+        <Box display="flex" alignItems="center" gap={1}>
           <Box
             sx={{
-              width: 40,
-              height: 40,
-              borderRadius: 2,
+              width: 32,
+              height: 32,
+              borderRadius: 1.5,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
-              boxShadow: '0 4px 12px rgba(25,118,210,0.3)',
+              boxShadow: '0 2px 8px rgba(25,118,210,0.3)',
             }}
           >
-            <SearchIcon sx={{ color: 'white', fontSize: 22 }} />
+            <SearchIcon sx={{ color: 'white', fontSize: 18 }} />
           </Box>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
               {t('quick.filters')}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {t('filter.description') || '快速篩選測試資料'}
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+              {t('filter.description')}
             </Typography>
           </Box>
         </Box>
@@ -206,8 +206,8 @@ export default function SimpleQuickFilters({
       <Box
         sx={{
           background: 'rgba(255,255,255,0.6)',
-          borderRadius: 2,
-          p: 2.5,
+          borderRadius: 1.5,
+          p: 2,
           border: '1px solid',
           borderColor: 'grey.200',
         }}
@@ -293,16 +293,21 @@ export default function SimpleQuickFilters({
           <Grid size={{ xs: 12, sm: 6, md: 2 }}>
             <Button
               fullWidth
-              variant="contained"
+              variant="outlined"
               startIcon={<SearchIcon />}
               onClick={handleOpenAdvanced}
               sx={{
-                background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',
-                boxShadow: '0 4px 12px rgba(25,118,210,0.25)',
+                borderColor: 'primary.main',
+                color: 'primary.main',
+                bgcolor: 'white',
+                fontWeight: 600,
+                borderWidth: 1.5,
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #1565c0 0%, #1976d2 100%)',
-                  boxShadow: '0 6px 16px rgba(25,118,210,0.35)',
+                  bgcolor: 'white',
+                  borderColor: 'primary.dark',
+                  color: 'primary.dark',
                   transform: 'translateY(-1px)',
+                  boxShadow: '0 4px 12px rgba(25,118,210,0.2)',
                 },
                 transition: 'all 0.2s ease',
               }}
@@ -314,24 +319,23 @@ export default function SimpleQuickFilters({
       </Box>
 
       {/* 快速日期選擇 - 新設計 */}
-      <Box mt={3}>
-        <Typography variant="body2" color="text.secondary" mb={1.5} sx={{ fontWeight: 500 }}>
-          {t('quick.date.range') || '快速日期範圍'}
+      <Box mt={2}>
+        <Typography variant="caption" color="text.secondary" mb={1} sx={{ fontWeight: 500, display: 'block' }}>
+          {t('quick.date.range')}
         </Typography>
-        <Box display="flex" gap={1.5} flexWrap="wrap">
+        <Box display="flex" gap={1} flexWrap="wrap">
           {dateRangeQuickOptions.map((option) => (
             <Chip
               key={option.label}
               label={option.label}
               onClick={() => handleDateRangeSelect(option.days)}
               variant="outlined"
-              size="medium"
+              size="small"
               sx={{
                 cursor: 'pointer',
                 borderColor: 'primary.main',
                 color: 'primary.main',
                 fontWeight: 500,
-                px: 1,
                 transition: 'all 0.2s ease',
                 '&:hover': {
                   background: 'linear-gradient(135deg, #1976d2 0%, #42a5f5 100%)',

@@ -73,7 +73,8 @@ function normalizeMesJson(input: any) {
     let station = rec['Station'] || rec['station'] || '';
     let model = rec['Model'] || rec['model'] || rec['Product Type'] || '';
     let workOrder = rec['Work Order'] || rec['WorkOrder'] || rec['工單'] || '';
-    let fn = rec['FN'] || rec['fn'] || '';
+    let fixtureNumber = rec['FN:'] || rec['FN'] || rec['fn'] || '';  // 對應到 Fixture Number
+    let partNumber = rec['Part Number'] || rec['PartNumber'] || rec['part_number'] || '';  // 對應到 Part Number
     let tester = rec['Tester'] || rec['tester'] || '';
 
     // 如果沒有基本資訊，嘗試從檔案結構推導
@@ -105,12 +106,23 @@ function normalizeMesJson(input: any) {
       station: station,
       model: model,
       workOrder: workOrder,
-      FN: fn,
+      fixtureNumber: fixtureNumber,  // Fixture Number
+      partNumber: partNumber,  // Part Number
       Tester: tester
     };
 
     const items = Array.isArray(rec.Items) ? rec.Items : [];
-    out.result = items.some((it: any) => String(it.result).toUpperCase() === 'FAIL') ? 'FAIL' : 'PASS';
+
+    // 結果判定優先順序：
+    // 1. 優先使用 JSON 中的 "Test Result" 欄位
+    // 2. 如果沒有，檢查 items 陣列中是否有 FAIL 的測項
+    // 3. 如果 items 為空，預設為 PASS
+    let testResult = rec['Test Result'] || rec['TestResult'] || rec['result'] || '';
+    if (testResult) {
+      out.result = String(testResult).toUpperCase() === 'FAIL' ? 'FAIL' : 'PASS';
+    } else {
+      out.result = items.some((it: any) => String(it.result).toUpperCase() === 'FAIL') ? 'FAIL' : 'PASS';
+    }
 
     // 保存原始 Items 陣列用於詳細檢視
     out.Items = items;
@@ -162,7 +174,8 @@ interface TestRecord {
   result: 'PASS' | 'FAIL';
   testTime: string;
   tester: string;
-  partNumber: string;
+  fixtureNumber: string;  // FN: 對應到 Fixture Number
+  partNumber: string;     // Part Number
   items: Array<{
     name: string;
     value: any;
@@ -358,7 +371,8 @@ export function SystemSettings() {
               result: normalizedData.result as 'PASS' | 'FAIL',
               testTime: testTime,  // 使用處理後的本地時間字串
               tester: normalizedData.Tester || '',  // 原始MES使用 'Tester' (大寫T)
-              partNumber: normalizedData.FN || '',  // 原始MES使用 'FN'
+              fixtureNumber: normalizedData.fixtureNumber || '',  // FN: 對應到 Fixture Number
+              partNumber: normalizedData.partNumber || '',  // Part Number 對應到 Part Number
               items: Array.isArray(normalizedData.Items) ? normalizedData.Items.map(item => ({  // 原始MES使用 'Items'
                 name: item.name || 'Unknown',
                 value: item.value !== undefined ? item.value : '',

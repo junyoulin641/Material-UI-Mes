@@ -88,7 +88,8 @@ const loadDataFromStorage = async (): Promise<GridRowsProp> => {
         result: record.result || 'FAIL',
         testTime: record.testTime || new Date().toISOString(),
         tester: record.tester || 'Unknown',
-        partNumber: record.partNumber || `PN-${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
+        fixtureNumber: record.fixtureNumber || '',  // Fixture Number
+        partNumber: record.partNumber || '',
         testDuration: 120,
         items: record.items || [],
       }));
@@ -112,7 +113,8 @@ const loadDataFromStorage = async (): Promise<GridRowsProp> => {
         result: record.result || 'FAIL',
         testTime: record.testTime || new Date().toISOString(),
         tester: record.tester || 'Unknown',
-        partNumber: record.partNumber || `PN-${Math.random().toString(36).substr(2, 8).toUpperCase()}`,
+        fixtureNumber: record.fixtureNumber || '',  // Fixture Number
+        partNumber: record.partNumber || '',
         testDuration: 120,
         items: record.items || [],
       }));
@@ -234,13 +236,27 @@ export default function EnhancedTableView({
         fontFamily: 'monospace',
       },
       {
+        field: 'fixtureNumber',
+        headerName: t('column.fixture.number'),
+        width: 130,
+        fontFamily: 'monospace',
+        renderCell: (params) => (
+          <Chip
+            label={params.value || '-'}
+            size="small"
+            color="info"
+            variant="outlined"
+          />
+        ),
+      },
+      {
         field: 'partNumber',
         headerName: t('column.part.number'),
         width: 130,
         fontFamily: 'monospace',
         renderCell: (params) => (
           <Chip
-            label={params.value}
+            label={params.value || '-'}
             size="small"
             color="secondary"
             variant="outlined"
@@ -519,9 +535,24 @@ export default function EnhancedTableView({
           {/* 匯出按鈕 */}
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Button
-              variant="contained"
+              variant="outlined"
               startIcon={<FileDownloadIcon />}
               onClick={openExportMenu}
+              sx={{
+                borderColor: 'primary.main',
+                color: 'primary.main',
+                bgcolor: 'white',
+                fontWeight: 600,
+                borderWidth: 1.5,
+                '&:hover': {
+                  bgcolor: 'white',
+                  borderColor: 'primary.dark',
+                  color: 'primary.dark',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 4px 12px rgba(25,118,210,0.2)',
+                },
+                transition: 'all 0.2s ease',
+              }}
             >
               {t('export')}
             </Button>
@@ -705,8 +736,13 @@ export default function EnhancedTableView({
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>
+                <Typography variant="subtitle2">{t('fixture.number')}</Typography>
+                <Chip label={selectedRow.fixtureNumber || '-'} size="small" color="info" variant="outlined" sx={{ mb: 2 }} />
+              </Grid>
+
+              <Grid size={{ xs: 12, sm: 6 }}>
                 <Typography variant="subtitle2">{t('part.number')}</Typography>
-                <Chip label={selectedRow.partNumber} size="small" color="secondary" variant="outlined" sx={{ mb: 2 }} />
+                <Chip label={selectedRow.partNumber || '-'} size="small" color="secondary" variant="outlined" sx={{ mb: 2 }} />
               </Grid>
 
               <Grid size={{ xs: 12, sm: 6 }}>

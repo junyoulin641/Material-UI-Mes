@@ -163,8 +163,8 @@ export const getDesignTokens = (mode: PaletteMode) => {
       },
       divider: mode === "dark" ? alpha(gray[700], 0.6) : alpha(gray[300], 0.4),
       background: {
-        default: "hsl(0, 0%, 99%)",
-        paper: "hsl(220, 35%, 97%)",
+        default: "#B5C3B2", // 與登入頁相同的綠灰色
+        paper: "#FFFFFF",   // 純白卡片，保持乾淨對比
         ...(mode === "dark" && {
           default: gray[900],
           paper: "hsl(220, 30%, 7%)",
@@ -279,8 +279,8 @@ export const colorSchemes = {
       },
       divider: alpha(gray[300], 0.4),
       background: {
-        default: "hsl(0, 0%, 99%)",
-        paper: "hsl(220, 35%, 97%)",
+        default: "#B5C3B2", // 與登入頁相同的綠灰色
+        paper: "#FFFFFF",   // 純白卡片，保持乾淨對比
       },
       text: {
         primary: gray[800],

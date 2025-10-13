@@ -23,7 +23,8 @@ export interface TestRecord {
   result: 'PASS' | 'FAIL';
   testTime: string;
   tester: string;
-  partNumber: string;
+  fixtureNumber: string;  // FN: 對應到 Fixture Number
+  partNumber: string;  // Part Number
   items: Array<{
     name: string;
     value: any;
@@ -83,16 +84,22 @@ export class MESDatabase {
   async saveLogFile(logFile: Omit<LogFile, 'id'>): Promise<string> {
     if (!this.db) throw new Error('Database not initialized');
 
-    const id = `${logFile.serial}_${Date.now()}`;
+    // 使用更唯一的 ID：serial + timestamp + random
+    const id = `${logFile.serial}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     const fullLogFile: LogFile = { ...logFile, id };
 
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['logFiles'], 'readwrite');
       const store = transaction.objectStore('logFiles');
-      const request = store.add(fullLogFile);
+      // 使用 put 而不是 add，允許覆蓋相同 id 的記錄
+      const request = store.put(fullLogFile);
 
       request.onsuccess = () => resolve(id);
-      request.onerror = () => reject(new Error('Failed to save log file'));
+      request.onerror = (event) => {
+        const error = (event.target as IDBRequest).error;
+        console.error('IndexedDB saveLogFile 錯誤:', error);
+        reject(new Error(`Failed to save log file: ${error?.message || 'Unknown error'}`));
+      };
     });
   }
 

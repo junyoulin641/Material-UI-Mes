@@ -21,8 +21,9 @@ import CssBaseline from "@mui/material/CssBaseline";
 import { LanguageProvider } from "./contexts/LanguageContext";           // 多語言支援
 import { FilterProvider } from "./contexts/FilterContext";               // 全域篩選狀態
 import { ToastProvider } from "./features/common/components/ToastSystem"; // 通知系統
+import { AuthProvider } from "./features/auth/contexts/AuthContext";     // 身份驗證
 import AppRouter from "./features/common/components/AppRouter";           // 路由系統
-
+import { Box } from "@mui/material";
 /**
  * App 組件 - 應用程式的根組件
  *
@@ -58,28 +59,31 @@ export default function App() {
      */
     <LanguageProvider>
       {/* 提供多語言功能給所有子組件 */}
-      <FilterProvider>
-        {/* 提供全域篩選狀態給所有子組件 */}
-        <ToastProvider>
-          {/* 提供通知系統功能給所有子組件 */}
+      <AuthProvider>
+        {/* 提供身份驗證功能給所有子組件 */}
+        <FilterProvider>
+          {/* 提供全域篩選狀態給所有子組件 */}
+          <ToastProvider>
+            {/* 提供通知系統功能給所有子組件 */}
 
-          {/*
-            CssBaseline: Material-UI 的 CSS 重置組件
-            - 移除瀏覽器預設樣式
-            - 統一不同瀏覽器的顯示效果
-            - enableColorScheme: 支援深淺色主題切換
-          */}
-          <CssBaseline enableColorScheme />
+            {/*
+              CssBaseline: Material-UI 的 CSS 重置組件
+              - 移除瀏覽器預設樣式
+              - 統一不同瀏覽器的顯示效果
+              - enableColorScheme: 支援深淺色主題切換
+            */}
+            <CssBaseline enableColorScheme />
 
-          {/*
-            AppRouter: 主要的路由和導航系統
-            - 負責根據 URL 顯示不同的頁面
-            - 包含側邊欄導航
-            - 管理頁面切換邏輯
-          */}
-          <AppRouter />
-        </ToastProvider>
-      </FilterProvider>
+            {/*
+              AppRouter: 主要的路由和導航系統
+              - 負責根據 URL 顯示不同的頁面
+              - 包含側邊欄導航
+              - 管理頁面切換邏輯
+            */}
+            <AppRouter />
+          </ToastProvider>
+        </FilterProvider>
+      </AuthProvider>
     </LanguageProvider>
   );
 }

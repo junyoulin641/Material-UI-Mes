@@ -3,7 +3,229 @@
 ## 專案概述
 製造執行系統 (MES) - 基於 Material-UI v7 和 TypeScript 的現代化 Web 應用程式
 
-## 最新更新記錄 (2025-10-02)
+## 最新更新記錄 (2025-10-13)
+
+### JSON 資料匯入修復與 IndexedDB 優化
+
+#### 🐛 測試結果判定邏輯修復
+- **問題描述**: 當 JSON 中 `Items` 欄位為空陣列時，即使 `"Test Result": "FAIL"`，系統仍錯誤判定為 PASS
+- **根本原因**:
+  - 舊邏輯只檢查 `Items` 陣列中是否有 FAIL 測項
+  - 忽略了 JSON 頂層的 `Test Result` 欄位
+- **修復方案** (SettingsView.tsx:116-125):
+  ```typescript
+  // 優先順序判定邏輯：
+  // 1. 優先使用 JSON 中的 "Test Result" 欄位
+  let testResult = rec['Test Result'] || rec['TestResult'] || rec['result'] || '';
+  if (testResult) {
+    out.result = String(testResult).toUpperCase() === 'FAIL' ? 'FAIL' : 'PASS';
+  } else {
+    // 2. 如果沒有 Test Result，才檢查 Items 陣列
+    out.result = items.some((it: any) => String(it.result).toUpperCase() === 'FAIL') ? 'FAIL' : 'PASS';
+  }
+  ```
+- **支援變體**: `Test Result`, `TestResult`, `result`（向後兼容）
+
+#### 🗄️ IndexedDB 儲存可靠性提升
+- **問題描述**: 儲存 LOG 檔案時發生重複鍵錯誤
+  ```
+  IndexedDB儲存失敗: WA3-FixtureNumber[1]-20251009-100327-CH570653100028002[1].log
+  Error: Failed to save log file
+  ```
+- **根本原因**:
+  - 使用 `store.add()` 當重複 ID 存在時會失敗
+  - ID 生成只用 `serial_timestamp` 容易產生碰撞
+- **修復方案** (MESDatabase.ts:84-104):
+  ```typescript
+  // 1. 更唯一的 ID 生成（加入隨機字串）
+  const id = `${logFile.serial}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // 2. 使用 put 取代 add（允許覆蓋）
+  const request = store.put(fullLogFile);
+
+  // 3. 詳細錯誤日誌
+  request.onerror = (event) => {
+    const error = (event.target as IDBRequest).error;
+    console.error('IndexedDB saveLogFile 錯誤:', error);
+    reject(new Error(`Failed to save log file: ${error?.message || 'Unknown error'}`));
+  };
+  ```
+
+#### 🌐 翻譯系統完善
+- **問題描述**: `import.result.summary` 翻譯鍵缺失，導入結果顯示原始鍵值
+- **修復內容**:
+  - 新增 `import.result.summary` 中英文翻譯
+  - 支援參數替換：`{json}`, `{log}`, `{paired}`, `{total}`
+  - 中文: `'匯入完成！JSON 檔案：{json}，LOG 檔案：{log}，成功配對：{paired}，總記錄數：{total}'`
+  - 英文: `'Import completed! JSON files: {json}, LOG files: {log}, Successfully paired: {paired}, Total records: {total}'`
+- **相關檔案**: LanguageContext.tsx (648行, 1222行)
+
+#### 📊 欄位映射完善（先前更新）
+- **fixtureNumber 映射**: `FN:` / `FN` / `fn` → `fixtureNumber`
+- **partNumber 映射**: `Part Number` / `PartNumber` / `part_number` → `partNumber`
+- **Table 顯示**: 治具號和料號列已加入測試記錄表格
+
+#### 🔧 修改檔案清單
+1. **SettingsView.tsx** (116-125行)
+   - 修復測試結果判定邏輯
+   - 優先讀取 `Test Result` 欄位
+
+2. **MESDatabase.ts** (84-104行)
+   - IndexedDB `saveLogFile` 方法優化
+   - 改用 `put()` 並增強 ID 唯一性
+
+3. **LanguageContext.tsx** (648行, 1222行)
+   - 新增 `import.result.summary` 翻譯鍵
+   - 支援動態參數替換
+
+4. **TableView.tsx** (之前更新)
+   - 新增 fixtureNumber 和 partNumber 列顯示
+
+#### ✅ 測試案例驗證
+**測試 JSON**:
+```json
+{
+  "Items": [],                          // ← 空陣列不影響判定
+  "Test Result": "FAIL",                // ← 正確讀取此欄位 ✅
+  "FN:": "M406C041",                    // ← 正確映射 ✅
+  "Part Number": "WA3-001",             // ← 正確映射 ✅
+  "Serial Number": "CH570653100032B06",
+  "Station": "PCBA_FT1_PB",
+  "Test Time": "2025-10-09 09:26:29"
+}
+```
+
+**預期結果**:
+- ✅ 測試結果：**FAIL**（正確判定）
+- ✅ 治具號：**M406C041**（正確顯示）
+- ✅ 料號：**WA3-001**（正確顯示）
+- ✅ LOG 檔案：**成功儲存到 IndexedDB**
+- ✅ 匯入通知：**完整顯示中英文訊息**
+
+#### 📈 改善效益
+- **資料準確性**: 測試結果判定不再因 Items 為空而錯誤
+- **系統穩定性**: IndexedDB 儲存不再因重複鍵而失敗
+- **用戶體驗**: 匯入結果訊息清晰完整
+- **向後兼容**: 支援多種欄位命名變體
+
+---
+
+## 之前更新記錄 (2025-10-13)
+
+### 登入頁面設計與主題色彩統一
+
+#### 登入頁面多版本設計系統
+- **版本管理**: 建立完整的登入頁面設計版本系統
+  - `LoginPage_Version1.tsx`: 左右分欄商務版（保留）
+  - `LoginPage_Version2.tsx`: Netflix 極簡深色版（紅黑配色）
+  - `LoginPage_Version3.tsx`: Duolingo 趣味友善版（綠色系）
+  - `LoginPage_Version4.tsx`: 全螢幕背景圖案版（保留）
+  - `LoginPage_Version5.tsx`: 極簡優雅版 - 深青色 (#4a6670)
+  - `LoginPage_Version6.tsx`: 極簡優雅版 - 深藍紫 (#2d3561)
+  - `LoginPage_Version7.tsx`: 極簡優雅版 - 深灰藍 (#37474f)
+  - `LoginPage_Version8.tsx`: 極簡優雅版 - 夢幻藍紫漸層 (#4a5fd6 to #6b46c1)
+
+#### 登入頁面預覽系統
+- **LoginPreview.tsx**: 設計切換預覽組件
+  - 支援即時切換所有設計版本
+  - 顯示每個版本的特色標籤（設計風格、配色方案、特殊功能）
+  - 頂部控制區提供版本選擇按鈕
+  - 當前版本資訊卡片展示設計描述
+
+#### V5 極簡優雅設計確立
+- **設計理念**: 基於用戶提供的參考圖片 (1.webp)
+- **關鍵設計元素**:
+  - 深色背景搭配純白 UI 元素
+  - SVG Logo 搭配 glow 濾鏡效果 (`feGaussianBlur`)
+  - 無邊框輸入框 (`variant="standard"`)，僅保留底線
+  - 半透明按鈕配毛玻璃效果 (`backdropFilter: blur(10px)`)
+  - 入場動畫 (`fadeInDown`, `fadeIn`)
+  - 微妙的背景紋理 (徑向漸層疊加)
+- **移除的元素**: 頂部導航列（Back to store, Sign Up）
+- **新增的元素**:
+  - 系統標題 "MES SYSTEM" 和副標題 "Manufacturing Execution"
+  - 裝飾性分隔線
+  - 測試帳號提示
+  - 版權資訊
+
+#### 色彩變體系統 (基於 V5)
+- **設計模式**: 保持 V5 的佈局和 UI 元素，僅變更背景顏色
+- **色彩方案**:
+  - V5: `#4a6670` (深青色/深藍灰)
+  - V6: `#2d3561` (深藍紫色)
+  - V7: `#37474f` (深灰藍色)
+  - V8: `linear-gradient(135deg, #4a5fd6 0%, #6b46c1 100%)` (夢幻藍紫漸層)
+- **細節優化**: V8 使用更強的 glow 效果和更高的透明度營造夢幻氛圍
+
+#### 主題色彩系統統一
+- **問題**: 登入頁面使用 `#B5C3B2`（淺綠灰色），但主畫面為白色，視覺斷層
+- **解決方案**: 統一主畫面背景色為登入頁面相同色調
+- **修改檔案**: `src/shared/theme/themePrimitives.ts`
+  - Light mode `background.default`: `#B5C3B2` (與登入頁相同)
+  - Light mode `background.paper`: `#FFFFFF` (純白卡片保持對比)
+  - 同時更新 `getDesignTokens()` 和 `colorSchemes.light` 兩處配置
+- **視覺效果**: 登入頁到主畫面無縫過渡，白色卡片在綠灰背景上形成清晰層次
+
+#### 技術實作細節
+```typescript
+// SVG Logo with Glow Effect
+<svg width="70" height="70" viewBox="0 0 70 70">
+  <defs>
+    <filter id="glow8">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <path d="M18 52V18L35 30L52 18V52"
+        stroke="white" strokeWidth="3.5"
+        filter="url(#glow8)" opacity="0.95"/>
+</svg>
+
+// Material-UI Standard TextField (Borderless with Underline)
+<TextField
+  variant="standard"
+  sx={{
+    '& .MuiInput-root': {
+      color: 'white',
+      '&:before': { borderColor: 'rgba(255,255,255,0.4)' },
+      '&:hover:not(.Mui-disabled):before': { borderColor: 'rgba(255,255,255,0.6)' },
+      '&:after': { borderColor: 'white' }
+    }
+  }}
+/>
+
+// Glassmorphism Button
+<Button
+  sx={{
+    bgcolor: 'rgba(255,255,255,0.2)',
+    backdropFilter: 'blur(10px)',
+    border: '1px solid rgba(255,255,255,0.3)',
+    '&:hover': {
+      bgcolor: 'rgba(255,255,255,0.3)',
+      boxShadow: '0 4px 20px rgba(255,255,255,0.2)',
+      transform: 'translateY(-1px)'
+    }
+  }}
+/>
+
+// Theme Configuration
+background: {
+  default: "#B5C3B2", // 與登入頁相同的綠灰色
+  paper: "#FFFFFF",   // 純白卡片，保持乾淨對比
+}
+```
+
+#### 相關檔案
+- `src/features/auth/components/LoginPage_Version1-8.tsx` - 8 個登入頁面設計版本
+- `src/features/auth/components/LoginPreview.tsx` - 設計預覽切換系統
+- `src/shared/theme/themePrimitives.ts` - 主題配置（背景色統一）
+
+---
+
+## 之前更新記錄 (2025-10-02)
 
 ### KPI 計算修復與熱力圖優化
 

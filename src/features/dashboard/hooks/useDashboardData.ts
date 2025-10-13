@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getMESDatabase, TestRecord } from '../../../utils/MESDatabase';
 import { SimpleFilterOptions } from '../components/SimpleQuickFilters';
+import { useLanguage } from '../../../contexts/LanguageContext';
 import {
   calculateKPI,
   calculateStationStats,
@@ -18,6 +19,7 @@ import {
  * @param filters - 從 UI 傳入的篩選條件物件
  */
 export function useDashboardData(filters: SimpleFilterOptions) {
+  const { t } = useLanguage();
   const [allRecords, setAllRecords] = useState<TestRecord[]>([]);
   const [configuredStations, setConfiguredStations] = useState<string[]>([]);
   const [configuredModels, setConfiguredModels] = useState<string[]>([]);
@@ -120,14 +122,16 @@ export function useDashboardData(filters: SimpleFilterOptions) {
       const diffTime = Math.abs(endDate.getTime() - startDate.getTime());
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
       const formatDate = (date: Date) => date.toLocaleDateString('zh-TW', { month: '2-digit', day: '2-digit' });
-      const intervalText = diffDays === 1 ? `${formatDate(startDate)}` : `${formatDate(startDate)} - ${formatDate(endDate)} (${diffDays}天)`;
+      const intervalText = diffDays === 1
+        ? `${formatDate(startDate)}`
+        : `${formatDate(startDate)} - ${formatDate(endDate)} (${diffDays} ${t('days')})`;
       return { startDate, endDate, intervalText, diffDays };
     }
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(endDate.getDate() - 6);
-    return { startDate, endDate, intervalText: '最近 7 天', diffDays: 7 };
-  }, [filters.dateFrom, filters.dateTo]);
+    return { startDate, endDate, intervalText: t('last.7.days'), diffDays: 7 };
+  }, [filters.dateFrom, filters.dateTo, t]);
 
   // --- 所有統計資料計算 ---
   const stats = useMemo(() => calculateKPI(filteredData, filters.station), [filteredData, filters.station]);

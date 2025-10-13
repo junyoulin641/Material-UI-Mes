@@ -269,6 +269,7 @@ export default function CompleteMesDashboard({ showAdvanced = true }: CompleteMe
     <Box sx={{
       width: "100%",
       maxWidth: { sm: "100%", md: "1700px" },
+      
       pl: { xs: 2, sm: 3, md: 4 }, // 增加左側邊距
       pr: { xs: 2, sm: 3 },
       py: 3

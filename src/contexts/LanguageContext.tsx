@@ -34,7 +34,7 @@ export type Language = 'zh-TW' | 'zh-CN' | 'en-US';
 interface LanguageContextType {
   language: Language;                        // 當前語言（'zh-TW' 或 'zh-CN' 或 'en-US'）
   setLanguage: (language: Language) => void; // 切換語言的函數
-  t: (key: string) => string;                // 翻譯函數（translate 縮寫）
+  t: (key: string, params?: Record<string, string | number>) => string; // 翻譯函數（translate 縮寫），支援參數替換
 }
 
 // ===== Context 建立 =====
@@ -124,6 +124,9 @@ const translations = {
     'add.model': '新增機種',
     'save.settings': '儲存設定',
     'refresh': '重新整理',
+    'days': '天',
+    'filter.description': '快速篩選測試資料',
+    'quick.date.range': '快速日期範圍',
 
     // Log Query
     'log.query.title': 'LOG 查詢',
@@ -191,6 +194,7 @@ const translations = {
     'retest.count': '複測次數',
     'failure.reason': '失敗原因',
     'test.time': '測試時間',
+    'fixture.number': '治具號',
     'part.number': '料號',
     'result': '結果',
     'actions': '操作',
@@ -229,6 +233,7 @@ const translations = {
     'column.actions': '操作',
     'column.station': '站別',
     'column.model': '機種',
+    'column.fixture.number': '治具號',
     'column.part.number': '料號',
     'column.result': '結果',
     'column.test.time': '測試時間',
@@ -492,6 +497,27 @@ const translations = {
     'system.user': '系統用戶',
     'system.email': 'system@mes.local',
 
+    // Authentication & User - 登入與使用者
+    'login.title': 'MES 系統登入',
+    'login.subtitle': '製造執行系統 - Manufacturing Execution System',
+    'login.username': '使用者名稱',
+    'login.password': '密碼',
+    'login.remember.me': '記住我',
+    'login.button': '登入',
+    'login.logging.in': '登入中...',
+    'login.demo.hint': '📌 測試帳號：',
+    'login.demo.credentials': 'admin / admin123 或 user / user123',
+    'login.error.username.required': '請輸入使用者名稱',
+    'login.error.password.required': '請輸入密碼',
+    'login.error.invalid.credentials': '帳號或密碼錯誤',
+    'logout': '登出',
+    'role.admin': '管理員',
+    'role.user': '一般使用者',
+    'user.preferences': '使用者偏好',
+    'login.feature.1': '即時生產監控與數據分析',
+    'login.feature.2': '完整測試記錄追蹤',
+    'login.feature.3': 'AI 智能失敗原因分析',
+
     // Analysis & AI - Extended
     'analysis.error': '分析過程中發生錯誤',
     'analyzing.log.content': '正在分析 LOG 內容...',
@@ -617,7 +643,10 @@ const translations = {
     // Import
     'import.completed': '匯入完成',
     'import.error': '匯入錯誤',
-    'import.failed': '匯入失敗'
+    'import.failed': '匯入失敗',
+    'import.success': '成功匯入 {total} 筆記錄（配對 {paired} 筆 LOG）',
+    'import.result.summary': '匯入完成！JSON 檔案：{json}，LOG 檔案：{log}，成功配對：{paired}，總記錄數：{total}',
+    'data.status.info': '目前有 {count} 筆測試資料'
   },
   'en-US': {
     // Dashboard
@@ -675,6 +704,9 @@ const translations = {
     'add.model': 'Add Model',
     'save.settings': 'Save Settings',
     'refresh': 'Refresh',
+    'days': 'Days',
+    'filter.description': 'Quickly filter test data',
+    'quick.date.range': 'Quick Date Range',
     'data.cleared.success': 'Clear success',    
     'data.clear.error': 'Clear error',
     'operation.failed': 'Operation failed',
@@ -751,6 +783,7 @@ const translations = {
     'retest.count': 'Retest Count',
     'failure.reason': 'Failure Reason',
     'test.time': 'Test Time',
+    'fixture.number': 'Fixture Number',
     'part.number': 'Part Number',
     'result': 'Result',
     'actions': 'Actions',
@@ -787,6 +820,7 @@ const translations = {
     'column.actions': 'Actions',
     'column.station': 'Station',
     'column.model': 'Model',
+    'column.fixture.number': 'Fixture Number',
     'column.part.number': 'Part Number',
     'column.result': 'Result',
     'column.test.time': 'Test Time',
@@ -1037,6 +1071,27 @@ const translations = {
     'system.user': 'System User',
     'system.email': 'system@mes.local',
 
+    // Authentication & User - Login & User
+    'login.title': 'MES System Login',
+    'login.subtitle': 'Manufacturing Execution System',
+    'login.username': 'Username',
+    'login.password': 'Password',
+    'login.remember.me': 'Remember Me',
+    'login.button': 'Login',
+    'login.logging.in': 'Logging in...',
+    'login.demo.hint': '📌 Demo Account:',
+    'login.demo.credentials': 'admin / admin123 or user / user123',
+    'login.error.username.required': 'Please enter username',
+    'login.error.password.required': 'Please enter password',
+    'login.error.invalid.credentials': 'Invalid username or password',
+    'logout': 'Logout',
+    'role.admin': 'Administrator',
+    'role.user': 'User',
+    'user.preferences': 'User Preferences',
+    'login.feature.1': 'Real-time Production Monitoring & Data Analysis',
+    'login.feature.2': 'Complete Test Record Tracking',
+    'login.feature.3': 'AI-Powered Failure Analysis',
+
     // Analysis & AI - Extended
     'analysis.error': 'Error occurred during analysis',
     'analyzing.log.content': 'Analyzing LOG content...',
@@ -1162,7 +1217,10 @@ const translations = {
     // Import
     'import.completed': 'Import completed',
     'import.error': 'Import error',
-    'import.failed': 'Import failed'
+    'import.failed': 'Import failed',
+    'import.success': 'Successfully imported {total} records (paired {paired} LOGs)',
+    'import.result.summary': 'Import completed! JSON files: {json}, LOG files: {log}, Successfully paired: {paired}, Total records: {total}',
+    'data.status.info': 'Currently have {count} test data'
   }
 };
 
@@ -1223,18 +1281,30 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
    * t - 翻譯函數（translate 的縮寫）
    *
    * @param {string} key - 翻譯鍵（例如：'mes.overview'）
+   * @param {Record<string, string | number>} params - 可選參數物件，用於替換文字中的佔位符
    * @returns {string} - 翻譯後的文字（例如：'MES 總覽'）
    *
    * 執行邏輯：
    * 1. 根據當前語言從 translations 查找對應的翻譯
    * 2. 如果找到，返回翻譯文字
-   * 3. 如果找不到，返回原始 key（fallback 機制，避免顯示 undefined）
+   * 3. 如果有參數，替換文字中的 {key} 佔位符
+   * 4. 如果找不到，返回原始 key（fallback 機制，避免顯示 undefined）
    *
    * 使用範例：
    * t('mes.overview') → 'MES 總覽' (當 language === 'zh-TW')
+   * t('import.success', { total: 10, paired: 5 }) → '成功匯入 10 筆記錄（配對 5 筆 LOG）'
    */
-  const t = (key: string): string => {
-    return translations[language][key] || key;
+  const t = (key: string, params?: Record<string, string | number>): string => {
+    let text = translations[language][key] || key;
+
+    // 如果有參數，替換文字中的 {key} 佔位符
+    if (params) {
+      Object.keys(params).forEach(paramKey => {
+        text = text.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(params[paramKey]));
+      });
+    }
+
+    return text;
   };
 
   // ===== 副作用處理 =====

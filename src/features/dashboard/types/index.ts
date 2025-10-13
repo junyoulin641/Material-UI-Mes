@@ -32,6 +32,8 @@ export interface TestRecord {
   result: 'PASS' | 'FAIL';
   datetime: string;
   tester?: string;
+  fixtureNumber?: string;  // FN: 對應到 Fixture Number
+  partNumber?: string;     // Part Number
   items?: TestItem[];
   [key: string]: any;
 }

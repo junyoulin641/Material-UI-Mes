@@ -14,6 +14,7 @@ import {
   HelpOutlineRounded as HelpIcon,
   HomeRounded as HomeIcon,
   Replay as RetestIcon,
+  Logout as LogoutIcon,
 } from '@mui/icons-material';
 import { useLanguage } from '../../../contexts/LanguageContext';
 
@@ -26,6 +27,8 @@ import AIAnalysisView from '../../ai-analysis/components/AIAnalysisView';
 import SettingsView from '../../settings/components/SettingsView';
 import UserPreferences from '../../settings/components/UserPreferences';
 import RetestListView from '../../retest/components/RetestListView';
+import LoginPage from '../../auth/components/LoginPage';
+import { useAuth } from '../../auth/contexts/AuthContext';
 
 export type ViewType = 'dashboard' | 'table' | 'logs' | 'mtcct' | 'ai' | 'retest' | 'settings' | 'help';
 
@@ -73,6 +76,12 @@ export function AppRouter({ children }: AppRouterProps) {
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const { t } = useLanguage();
+  const { isAuthenticated, user, login, logout } = useAuth();
+
+  // 如果未登入，顯示登入預覽頁面（可切換設計）
+  if (!isAuthenticated) {
+    return <LoginPage onLogin={login} />;
+  }
 
   const mainListItems = [
     { id: 'dashboard' as ViewType, label: t('dashboard'), icon: <DashboardIcon /> },
@@ -322,25 +331,34 @@ export function AppRouter({ children }: AppRouterProps) {
           >
             <Avatar
               sizes="small"
-              alt="System User"
-              sx={{ width: 36, height: 36 }}
+              alt={user?.displayName || 'User'}
+              sx={{ width: 36, height: 36, bgcolor: 'primary.main' }}
             >
-              SU
+              {user?.displayName.charAt(0).toUpperCase() || 'U'}
             </Avatar>
             <Box sx={{ mr: 'auto' }}>
               <Typography variant="body2" sx={{ fontWeight: 500, lineHeight: 1.2 }}>
-                {t('system.user')}
+                {user?.displayName || t('system.user')}
               </Typography>
               <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                system@mes.local
+                {user?.role === 'admin' ? t('role.admin') : t('role.user')}
               </Typography>
             </Box>
             <IconButton
               size="small"
               onClick={() => setPreferencesOpen(true)}
               sx={{ ml: 1 }}
+              title={t('user.preferences')}
             >
               <SettingsIcon fontSize="small" />
+            </IconButton>
+            <IconButton
+              size="small"
+              onClick={logout}
+              sx={{ ml: 0.5 }}
+              title={t('logout')}
+            >
+              <LogoutIcon fontSize="small" />
             </IconButton>
           </Stack>
         </Drawer>
